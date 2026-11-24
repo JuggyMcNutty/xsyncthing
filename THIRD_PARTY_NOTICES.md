@@ -10,6 +10,7 @@ grows as components are added.
 | [wolfSSL](https://github.com/wolfSSL/wolfssl) v5.9.4 | TLS 1.3/1.2 and crypto (`third_party/wolfssl`, settings in `third_party/wolfssl-config`) | GPL-3.0 |
 | [LZ4](https://github.com/lz4/lz4) v1.11.1 | BEP message compression (`third_party/lz4/lib`) | BSD-2-Clause |
 | [SQLite](https://sqlite.org) 3.54.1 | Index database (`third_party/sqlite`) | Public domain |
+| Mozilla CA bundle (curl's `cacert.pem`) | Roots for discovery and relay pool HTTPS (`assets/cacert.pem`) | MPL-2.0 |
 | [nlohmann/json](https://github.com/nlohmann/json) v3.12.0 | Config and REST JSON (`third_party/include/nlohmann`) | MIT |
 
 Planned:

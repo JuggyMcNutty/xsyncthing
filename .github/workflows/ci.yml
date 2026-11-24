@@ -81,6 +81,7 @@ jobs:
           path: |
             build-xsdk/xsyncthing.xex
             build-xsdk/xst-console-test.xex
+            assets/cacert.pem
           if-no-files-found: error
 
   release:
@@ -97,4 +98,4 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" xsyncthing.xex xst-console-test.xex --repo "$GITHUB_REPOSITORY" --generate-notes --prerelease
+        run: gh release create "$GITHUB_REF_NAME" xsyncthing.xex xst-console-test.xex assets/cacert.pem --repo "$GITHUB_REPOSITORY" --generate-notes --prerelease

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -55,6 +56,19 @@ public:
 	// Services the API and UI read status from (set by register_services; may be null).
 	class LocalDiscovery *local_discovery() const { return local_discovery_; }
 	void set_local_discovery(class LocalDiscovery *d) { local_discovery_ = d; }
+	class GlobalDiscovery *global_discovery() const { return global_discovery_; }
+	void set_global_discovery(class GlobalDiscovery *d) { global_discovery_ = d; }
+	// Addresses other services want announced too (the relay we're joined to).
+	std::vector<std::string> extra_announce_addresses() const
+	{
+		std::lock_guard lock(extra_mu_);
+		return extra_addresses_;
+	}
+	void set_extra_announce_addresses(std::vector<std::string> a)
+	{
+		std::lock_guard lock(extra_mu_);
+		extra_addresses_ = std::move(a);
+	}
 
 private:
 	Options options_;
@@ -68,6 +82,9 @@ private:
 	std::vector<std::function<void(App &)>> core_ready_;
 	bool started_ = false;
 	class LocalDiscovery *local_discovery_ = nullptr;
+	class GlobalDiscovery *global_discovery_ = nullptr;
+	mutable std::mutex extra_mu_;
+	std::vector<std::string> extra_addresses_;
 };
 
 // Adds the optional services (discovery, relays, REST API) the build has; defined in services.cpp.

@@ -60,6 +60,8 @@ add_library(xst_core STATIC
 	src/net/bep_connection.cpp
 	src/net/bep_handshake.cpp
 	src/net/connection_service.cpp
+	src/net/global_discovery.cpp
+	src/net/http_client.cpp
 	src/net/identity.cpp
 	src/net/local_discovery.cpp
 	src/net/tcp.cpp
@@ -69,38 +71,43 @@ target_include_directories(xst_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/gene
 # local_discovery is a Service of the App (src/app.hpp); app.cpp itself is linked by each main.
 target_include_directories(xst_core SYSTEM PUBLIC third_party/include)
 target_compile_options(xst_core PRIVATE ${XST_WARNINGS})
+target_compile_definitions(xst_core PRIVATE XST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite)
 # The posix filesystem backend serves both builds (xsdk maps POSIX file calls onto its drives).
 target_sources(xst_core PRIVATE src/platform/posix/fs_posix.cpp)
 
 if(XSDK)
 	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp src/platform/xsdk/volume.cpp
-		src/platform/xsdk/console.cpp)
+		src/platform/xsdk/console.cpp src/platform/xsdk/addresses.cpp)
 	target_link_libraries(xst_platform PUBLIC xst_core)
 	target_compile_options(xst_platform PRIVATE ${XST_WARNINGS})
 
 	add_executable(xsyncthing src/main_xsdk.cpp src/app.cpp src/services.cpp)
-	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core)
+	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core xst_platform)
 	target_compile_options(xsyncthing PRIVATE ${XST_WARNINGS})
 	xsdk_add_xex(xsyncthing TITLE_ID ${XST_TITLE_ID} NAME "xsyncthing" VERSION ${PROJECT_VERSION}.0)
 
 	# The on-console checks (tests/console): wolfCrypt's suite, identity, and a handshake with a peer.
 	add_executable(xst-console-test tests/console/console_test.cpp)
-	target_link_libraries(xst-console-test PRIVATE xst_wolfcrypt_test xst_platform xst_core)
+	target_link_libraries(xst-console-test PRIVATE xst_wolfcrypt_test xst_platform xst_core xst_platform)
 	target_compile_options(xst-console-test PRIVATE ${XST_WARNINGS})
 	xsdk_add_xex(xst-console-test TITLE_ID 0x58535954 NAME "xsyncthing tests" VERSION ${PROJECT_VERSION}.0)
 else()
-	add_library(xst_platform STATIC src/platform/posix/platform.cpp)
+	add_library(xst_platform STATIC src/platform/posix/platform.cpp src/platform/posix/addresses.cpp)
 	target_link_libraries(xst_platform PUBLIC xst_core)
 	target_compile_options(xst_platform PRIVATE ${XST_WARNINGS})
 
 	add_executable(xsyncthing src/main_host.cpp src/app.cpp src/services.cpp)
-	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core)
+	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core xst_platform)
 	target_compile_options(xsyncthing PRIVATE ${XST_WARNINGS})
 
 	add_executable(xst-handshake tools/handshake.cpp)
-	target_link_libraries(xst-handshake PRIVATE xst_core)
+	target_link_libraries(xst-handshake PRIVATE xst_core xst_platform)
 	target_compile_options(xst-handshake PRIVATE ${XST_WARNINGS})
+
+	add_executable(xst-lookup tools/discovery_lookup.cpp)
+	target_link_libraries(xst-lookup PRIVATE xst_platform xst_core xst_platform)
+	target_compile_options(xst-lookup PRIVATE ${XST_WARNINGS})
 
 	add_executable(xst-wolfcrypt-test tools/wolfcrypt_test_main.c)
 	target_link_libraries(xst-wolfcrypt-test PRIVATE xst_wolfcrypt_test xst_wolfssl)

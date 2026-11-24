@@ -18,6 +18,8 @@ public:
 	long write(std::span<const uint8_t> data) override;
 	void close() override;
 	void interrupt() override;
+	// Bounds each send and receive (SO_SNDTIMEO / SO_RCVTIMEO); a read that times out fails.
+	void set_timeout(int timeout_ms);
 	int fd() const { return fd_; }
 
 	// Connects to host:port (a dotted IPv4 address or a name) within timeout_ms; nullptr and error on failure.

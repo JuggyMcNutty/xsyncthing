@@ -10,6 +10,7 @@
 #include <poll.h>
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 namespace xst {
@@ -32,6 +33,15 @@ long TcpStream::write(std::span<const uint8_t> data)
 			continue;
 		return n;
 	}
+}
+
+void TcpStream::set_timeout(int timeout_ms)
+{
+	timeval tv{};
+	tv.tv_sec = timeout_ms / 1000;
+	tv.tv_usec = (timeout_ms % 1000) * 1000;
+	::setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+	::setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
 }
 
 void TcpStream::interrupt()

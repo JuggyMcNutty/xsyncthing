@@ -125,7 +125,7 @@ xsyncthing/
 - [x] A LAN sync test on the console against a PC (static address first).
 
 ### Phase 4: Discovery and relays
-- [ ] Local discovery over IPv4 broadcast, sending and receiving.
+- [x] Local discovery over IPv4 broadcast, sending and receiving.
 - [ ] HTTP/1.1 client; global discovery announce and query.
 - [ ] Relay client: pool lookup, join, session invites, BEP over a relay.
 

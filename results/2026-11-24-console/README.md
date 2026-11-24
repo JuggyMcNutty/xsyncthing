@@ -85,3 +85,14 @@ way they can find each other is the IPv4 broadcast on UDP 21027:
 - The console logged `discovery: 4FX6QBR at tcp://192.168.1.125:22301` and connected.
 - The PC's `/rest/system/discovery` lists the console at `tcp://192.168.1.118:22000`.
 - The packet format matches upstream's byte for byte (unit test against `tools/golden`).
+
+## Phase 4: global discovery (step 15)
+
+The console ran against Syncthing's public discovery servers over HTTPS/1.1. Our wolfSSL TLS checked their
+certificates against `cacert.pem`, which is copied beside the `.xex`.
+
+- **Announce:** the console announced with its device certificate. Looking it up with `xst-lookup` then returned
+  `tcp://152.117.116.12:22000` (the public address the server saw) and `tcp://192.168.1.118:22000` (the LAN address
+  we sent).
+- **Lookup:** with local discovery turned off on the console, and the PC configured only as `dynamic`, the console
+  still dialled the PC at `192.168.1.125:22301`. It learned that address from `discovery-lookup.syncthing.net`.
