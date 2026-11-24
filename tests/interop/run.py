@@ -66,6 +66,9 @@ def main():
     ap.add_argument("--xsyncthing", required=True)
     ap.add_argument("--work", default="/tmp/xst-interop")
     ap.add_argument("--fatx", action="store_true")
+    ap.add_argument("--relay", help="strelaysrv binary: connect A and B only through a local relay")
+    ap.add_argument("--relay-inbound", action="store_true",
+                    help="with --relay: B never dials; A reaches B through the relay B joined (B accepts invitations)")
     a = ap.parse_args()
 
     w = a.work
@@ -100,12 +103,29 @@ def main():
         bid = re.search(r"device ID ([A-Z0-9-]{63})", open(os.path.join(w, "b.log")).read()).group(1)
         check("B starts and makes an identity", ok and bool(bid))
 
+        relay_uri = None
+        if a.relay:
+            os.makedirs(os.path.join(w, "relay-keys"), exist_ok=True)
+            rl = open(os.path.join(w, "relay.log"), "w")
+            pr = subprocess.Popen([a.relay, "-listen", "127.0.0.1:22267", "-pools", "", "-keys",
+                                   os.path.join(w, "relay-keys"), "-status-srv", ""],
+                                  stdout=rl, stderr=subprocess.STDOUT, start_new_session=True)
+            procs.append(pr)
+            ok = wait_for("the relay's ID", lambda: re.search(r"URI: (relay://\S+)", open(os.path.join(w, "relay.log")).read()), 20)
+            relay_uri = re.search(r"URI: (relay://\S+)", open(os.path.join(w, "relay.log")).read()).group(1)
+            relay_uri = relay_uri.replace("0.0.0.0", "127.0.0.1").replace(":22267", ":22267")
+            check("a local strelaysrv runs", ok)
+
         cfg_path = os.path.join(w, "b-home", "config.json")
         c = json.load(open(cfg_path))
         c["options"].update(listenAddresses=[f"tcp://127.0.0.1:{B_PORT}"], globalAnnounceEnabled=False,
                             localAnnounceEnabled=False, relaysEnabled=False)
         dev = dict(c["defaults"]["device"])
         dev.update(deviceID=aid, name="stock-a", addresses=[f"tcp://127.0.0.1:{A_PORT}"])
+        if relay_uri:
+            # B reaches A only through the relay (and joins it, so A could reach B the same way).
+            c["options"].update(listenAddresses=[relay_uri], relaysEnabled=True)
+            dev.update(addresses=[] if a.relay_inbound else [relay_uri])
         c["devices"].append(dev)
         f = dict(c["defaults"]["folder"])
         f.update(id="interop", label="Interop", path=b_data, rescanIntervalS=3,
@@ -122,11 +142,13 @@ def main():
         procs.append(pa)
         key = re.search(r"<apikey>(.*)</apikey>", open(os.path.join(w, "a-home", "config.xml")).read()).group(1)
         check("stock Syncthing's API is up", wait_for("A's API", lambda: http(key, "GET", "/rest/system/ping"), 30))
+        a_listen = [relay_uri] if relay_uri else [f"tcp://127.0.0.1:{A_PORT}"]
+        b_addr = [relay_uri] if relay_uri else [f"tcp://127.0.0.1:{B_PORT}"]
         http(key, "PATCH", "/rest/config/options",
-             {"listenAddresses": [f"tcp://127.0.0.1:{A_PORT}"], "globalAnnounceEnabled": False,
-              "localAnnounceEnabled": False, "relaysEnabled": False, "natEnabled": False})
+             {"listenAddresses": a_listen, "globalAnnounceEnabled": False,
+              "localAnnounceEnabled": False, "relaysEnabled": bool(relay_uri), "natEnabled": False})
         http(key, "POST", "/rest/config/devices",
-             {"deviceID": bid, "name": "xst-b", "addresses": [f"tcp://127.0.0.1:{B_PORT}"]})
+             {"deviceID": bid, "name": "xst-b", "addresses": b_addr})
         http(key, "POST", "/rest/config/folders",
              {"id": "interop", "label": "Interop", "path": a_data, "rescanIntervalS": 3, "fsWatcherEnabled": True,
               "fsWatcherDelayS": 1, "devices": [{"deviceID": bid}]})
@@ -136,7 +158,12 @@ def main():
                               stdout=b_log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
         procs.append(pb)
         check("A and B connect", wait_for(
-            "a connection", lambda: http(key, "GET", "/rest/system/connections")["connections"][bid]["connected"], 60))
+            "a connection", lambda: http(key, "GET", "/rest/system/connections")["connections"][bid]["connected"], 90))
+        if relay_uri:
+            conn = http(key, "GET", "/rest/system/connections")["connections"][bid]
+            check(f"... through the relay ({conn.get('type')})", conn.get("type", "").startswith("relay"))
+            if a.relay_inbound:
+                check("... A dialed (B accepted a relay invitation)", conn.get("type") == "relay-client")
 
         def A(*p):
             return os.path.join(a_data, *p)
@@ -173,53 +200,58 @@ def main():
         shutil.rmtree(B("from-b"))
         check("deletion B -> A", wait_for("deletion on A", lambda: not os.path.exists(A("from-b")), 90))
 
-        # 4. A conflict: pause B's connection by stopping B, edit both, restart B.
-        pb.send_signal(signal.SIGTERM)
-        pb.wait(30)
-        procs.remove(pb)
-        open(A("hello.txt"), "w").write("A's concurrent version\n")
-        time.sleep(4)  # let A rescan and record its version
-        open(B("hello.txt"), "w").write("B's concurrent version, written later\n")
-        future = time.time() + 60
-        os.utime(B("hello.txt"), (future, future))  # make B's the newer one, so it wins
-        b_log = open(os.path.join(w, "b.log"), "a")
-        pb = subprocess.Popen([a.xsyncthing, "--home", os.path.join(w, "b-home"), "--name", "xst-b", "--no-api"],
-                              stdout=b_log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
-        procs.append(pb)
-
-        def conflict_resolved():
-            ca = [n for n in os.listdir(a_data) if ".sync-conflict-" in n]
-            cb = [n for n in os.listdir(b_data) if ".sync-conflict-" in n]
-            return same(A("hello.txt"), B("hello.txt")) and (ca or cb) and \
-                open(A("hello.txt")).read().startswith("B's")
-        check("concurrent edits: newer wins on both sides, a conflict copy is kept",
-              wait_for("the conflict to settle", conflict_resolved, 120))
-
-        # 5. With FATX rules: a name B can't store stays on A (B reports it, never deletes it).
-        if a.fatx:
-            long_name = "this-file-name-is-much-too-long-for-the-xbox-fatx-volume.txt"
-            open(A(long_name), "w").write("must survive\n")
-            time.sleep(20)  # several scan/pull rounds on both sides
-            check("a name FATX can't hold is left alone on A (not deleted)", os.path.exists(A(long_name)))
-            check("... and isn't written on B", not os.path.exists(B(long_name)))
-
-        # 6. Completion as stock Syncthing sees it.
-        ok = wait_for("completion", lambda: http(
-            key, "GET", f"/rest/db/completion?folder=interop&device={bid}")["completion"] == 100, 60)
-        if not ok:
-            print("  A's completion for B:", http(key, "GET", f"/rest/db/completion?folder=interop&device={bid}"))
-            print("  A's remote need for B:", json.dumps(http(
-                key, "GET", f"/rest/db/remoteneed?folder=interop&device={bid}"))[:800])
-        check("A reports B 100% complete", ok)
-        # 7. B stops quickly while connected (the console's watchdog gives it 15 s).
-        t = time.time()
-        pb.send_signal(signal.SIGTERM)
-        try:
-            pb.wait(15)
+        if a.relay_inbound:
+            # The remaining checks restart B, and stock Syncthing then waits relayReconnectIntervalM (10 min) before
+            # dialing through a relay again (lib/connections relay_dial.go); the inbound path is covered above.
+            print("  (--relay-inbound: skipping the restart-based checks)")
+        else:
+            # 4. A conflict: pause B's connection by stopping B, edit both, restart B.
+            pb.send_signal(signal.SIGTERM)
+            pb.wait(30)
             procs.remove(pb)
-            check(f"B stops within 15 s while connected ({time.time() - t:.1f} s)", True)
-        except subprocess.TimeoutExpired:
-            check("B stops within 15 s while connected", False)
+            open(A("hello.txt"), "w").write("A's concurrent version\n")
+            time.sleep(4)  # let A rescan and record its version
+            open(B("hello.txt"), "w").write("B's concurrent version, written later\n")
+            future = time.time() + 60
+            os.utime(B("hello.txt"), (future, future))  # make B's the newer one, so it wins
+            b_log = open(os.path.join(w, "b.log"), "a")
+            pb = subprocess.Popen([a.xsyncthing, "--home", os.path.join(w, "b-home"), "--name", "xst-b", "--no-api"],
+                                  stdout=b_log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
+            procs.append(pb)
+
+            def conflict_resolved():
+                ca = [n for n in os.listdir(a_data) if ".sync-conflict-" in n]
+                cb = [n for n in os.listdir(b_data) if ".sync-conflict-" in n]
+                return same(A("hello.txt"), B("hello.txt")) and (ca or cb) and \
+                    open(A("hello.txt")).read().startswith("B's")
+            check("concurrent edits: newer wins on both sides, a conflict copy is kept",
+                  wait_for("the conflict to settle", conflict_resolved, 120))
+
+            # 5. With FATX rules: a name B can't store stays on A (B reports it, never deletes it).
+            if a.fatx:
+                long_name = "this-file-name-is-much-too-long-for-the-xbox-fatx-volume.txt"
+                open(A(long_name), "w").write("must survive\n")
+                time.sleep(20)  # several scan/pull rounds on both sides
+                check("a name FATX can't hold is left alone on A (not deleted)", os.path.exists(A(long_name)))
+                check("... and isn't written on B", not os.path.exists(B(long_name)))
+
+            # 6. Completion as stock Syncthing sees it.
+            ok = wait_for("completion", lambda: http(
+                key, "GET", f"/rest/db/completion?folder=interop&device={bid}")["completion"] == 100, 60)
+            if not ok:
+                print("  A's completion for B:", http(key, "GET", f"/rest/db/completion?folder=interop&device={bid}"))
+                print("  A's remote need for B:", json.dumps(http(
+                    key, "GET", f"/rest/db/remoteneed?folder=interop&device={bid}"))[:800])
+            check("A reports B 100% complete", ok)
+            # 7. B stops quickly while connected (the console's watchdog gives it 15 s).
+            t = time.time()
+            pb.send_signal(signal.SIGTERM)
+            try:
+                pb.wait(15)
+                procs.remove(pb)
+                check(f"B stops within 15 s while connected ({time.time() - t:.1f} s)", True)
+            except subprocess.TimeoutExpired:
+                check("B stops within 15 s while connected", False)
     finally:
         for p in procs:
             try:

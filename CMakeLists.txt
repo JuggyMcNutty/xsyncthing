@@ -64,6 +64,7 @@ add_library(xst_core STATIC
 	src/net/http_client.cpp
 	src/net/identity.cpp
 	src/net/local_discovery.cpp
+	src/net/relay.cpp
 	src/net/tcp.cpp
 	src/net/tls.cpp
 )

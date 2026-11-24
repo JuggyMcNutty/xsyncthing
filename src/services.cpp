@@ -3,6 +3,7 @@
 #include "net/addresses.hpp"
 #include "net/global_discovery.hpp"
 #include "net/local_discovery.hpp"
+#include "net/relay.hpp"
 
 namespace xst {
 
@@ -33,6 +34,20 @@ void register_services(App &app)
 		a.connections().add_address_source(global.get());
 		a.set_global_discovery(global.get());
 		a.add_service(std::move(global));
+
+		// Relays: join one to be reachable through it, and dial devices through theirs.
+		auto relays = std::make_unique<RelayService>(a.config(), a.identity(), a.connections(),
+			[&a](std::vector<std::string> addrs) { a.set_extra_announce_addresses(std::move(addrs)); });
+		const Identity *identity = &a.identity();
+		Config *config = &a.config();
+		a.connections().set_relay_dialer([identity, config](const std::string &uri, const DeviceId &device,
+											 bool *server, std::string *error) -> std::unique_ptr<Stream> {
+			if (!config->options().value("relaysEnabled", true))
+				return nullptr;
+			return RelayService::dial(uri, device, *identity, server, error);
+		});
+		a.set_relays(relays.get());
+		a.add_service(std::move(relays));
 	});
 }
 

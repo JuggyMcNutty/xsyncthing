@@ -382,7 +382,7 @@ void ConnectionService::run_connection(std::unique_ptr<Stream> stream, std::stri
 		platform::log("connections: rejecting unknown device " + remote.to_string() + " (" + hello->device_name + ")");
 		return;
 	}
-	if (model_.is_connected(remote) && role == TlsOptions::Role::client) {
+	if (model_.is_connected(remote) && type.starts_with("tcp-client")) {
 		return; // already connected the other way
 	}
 	if (stopping_)
@@ -414,10 +414,14 @@ bool ConnectionService::try_dial(const DeviceId &device, const std::string &addr
 		if (!relay_dialer_)
 			return false;
 		std::string error;
-		auto stream = relay_dialer_(address, device, &error);
-		if (!stream)
+		bool server = false;
+		auto stream = relay_dialer_(address, device, &server, &error);
+		if (!stream) {
+			platform::log("connections: relay " + address + " for " + device.short_string() + ": " + error);
 			return false;
-		run_connection(std::move(stream), address, "relay-client", TlsOptions::Role::client, device);
+		}
+		run_connection(std::move(stream), address, "relay-client",
+			server ? TlsOptions::Role::server : TlsOptions::Role::client, device);
 		return true;
 	}
 	std::string host;

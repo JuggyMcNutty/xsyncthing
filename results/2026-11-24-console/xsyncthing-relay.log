@@ -1,0 +1,26 @@
+log: game:\xsyncthing.log
+log: named after \Device\Harddisk0\Partition1\xsyncthing\xsyncthing.xex
+log: also over UDP to 192.168.1.125:7372
+xsyncthing: xsyncthing v0.0.1 starting
+display: 1280x720 scaled to the 1920x1080 output
+display: the line counter reached 720 after 29384 us
+PASS: xsyncthing: xsdk_gpu_open
+display: 1280x720 scaled to the 1920x1080 output
+display: the line counter reached 720 after 22882 us
+PASS: xsyncthing: xsdk_present_open
+PASS: xsyncthing: xsdk_text_open
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\) failed: 0xC0000035
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\xsyncthing) failed: 0xC0000035
+app: device ID SDHOS53-TTPHFBT-6SBF6IS-2QQKVNK-DR472SD-DV6KBTG-ZCLX3NU-DYNZZA4
+PASS: xsyncthing: the daemon starts
+volume: hdd:/xsyncthing/folders/lan is fatx (kernel says "FATX", names up to 42)
+connections: listening on tcp port 22000
+PASS: xsyncthing: the first frame was presented
+relay: joined relay://195.72.60.105:22067/?id=OTEEI26-LPWK4T4-TTPX6UP-4Z5TOKM-CBOJKK3-75R5V3B-QVJBCH4-CWZVIQM
+connections: connected to 4FX6QBR (bazzite, syncthing v2.1.7) at 195.72.60.105:22067 relay-server
+xsyncthing: stop.txt found, stopping
+connections: 4FX6QBR disconnected: reading header length: EOF
+xsyncthing: the daemon stopped in 504 ms
+PASS: xsyncthing: the daemon stops
+checks: 6 passed, 0 failed
+exit: status 0

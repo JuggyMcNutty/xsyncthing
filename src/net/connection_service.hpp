@@ -23,9 +23,10 @@ public:
 	virtual std::vector<std::string> lookup(const DeviceId &device) = 0;
 };
 
-// Connects a stream to a relay session for a device (net/relay); nullptr if relays can't reach it.
+// Connects a stream to a relay session for a device (net/relay); nullptr if relays can't reach it. *server says
+// whether we must be the TLS server on the session.
 using RelayDialer = std::function<std::unique_ptr<Stream>(const std::string &relay_uri, const DeviceId &device,
-	std::string *error)>;
+	bool *server, std::string *error)>;
 
 // Listens for BEP connections, dials configured devices, and runs each connection: TLS 1.3, Hello, then BEP
 // messages to and from the model. As lib/connections.

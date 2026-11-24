@@ -37,6 +37,7 @@ long TcpStream::write(std::span<const uint8_t> data)
 
 void TcpStream::set_timeout(int timeout_ms)
 {
+	// 0 clears the timeouts (blocking without limit).
 	timeval tv{};
 	tv.tv_sec = timeout_ms / 1000;
 	tv.tv_usec = (timeout_ms % 1000) * 1000;

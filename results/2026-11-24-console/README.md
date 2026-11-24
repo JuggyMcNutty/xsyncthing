@@ -96,3 +96,18 @@ certificates against `cacert.pem`, which is copied beside the `.xex`.
   we sent).
 - **Lookup:** with local discovery turned off on the console, and the PC configured only as `dynamic`, the console
   still dialled the PC at `192.168.1.125:22301`. It learned that address from `discovery-lookup.syncthing.net`.
+
+## Phase 4: relays (step 16)
+
+- **Setup:** the console had relays on and no address for the PC. The PC listened on loopback only, so neither side
+  could dial the other directly.
+- **Joining:** the console fetched `https://relays.syncthing.net/endpoint`, joined `relay://195.72.60.105:22067`
+  (a public relay), and announced it through global discovery.
+- **Connecting:** the PC's stock Syncthing reached the console through that relay. It saw a `relay-client`
+  connection; the console logged `relay-server` after accepting the session invitation.
+- **Syncing:** a file written on the PC (`relay.txt`) arrived on the console over the relayed connection.
+
+On the host, `tests/interop/run.py --relay <strelaysrv>` runs the full interop suite through a local strelaysrv v2.1.7
+in both directions:
+- xsyncthing dials: 14/14
+- stock Syncthing dials, xsyncthing accepts the invitation: 12/12

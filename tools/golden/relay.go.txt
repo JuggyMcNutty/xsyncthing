@@ -1,0 +1,31 @@
+// Relay golden vectors (tests/golden/bep.txt, relay_*): run as cmd/xstrelay inside a syncthing checkout.
+package main
+
+import (
+	"bytes"
+	"encoding/hex"
+	"fmt"
+
+	"github.com/syncthing/syncthing/lib/relay/protocol"
+)
+
+func out(name string, m any) {
+	var b bytes.Buffer
+	if err := protocol.WriteMessage(&b, m); err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s %s\n", name, hex.EncodeToString(b.Bytes()))
+}
+
+func main() {
+	id := make([]byte, 32)
+	for i := range id {
+		id[i] = byte(i + 1)
+	}
+	out("relay_join", protocol.JoinRelayRequest{Token: "tok"})
+	out("relay_connect", protocol.ConnectRequest{ID: id})
+	out("relay_response", protocol.Response{Code: 1, Message: "not found"})
+	out("relay_invitation", protocol.SessionInvitation{From: id, Key: id[:16], Address: []byte{10, 0, 0, 7}, Port: 22067, ServerSocket: true})
+	out("relay_ping", protocol.Ping{})
+	out("relay_join_session", protocol.JoinSessionRequest{Key: id[:16]})
+}
