@@ -110,12 +110,12 @@ xsyncthing/
 - [ ] CI: a host job, plus an xsdk job that caches the toolchain and uploads the `.xex`.
 
 ### Phase 1: TLS spike (biggest risk)
-- [ ] Port wolfSSL to xsdk with the settings above and run its tests (`wolfcrypt_test`) on the console.
-- [ ] Generate an Ed25519 cert on the console and compute the device ID.
-- [ ] Complete a TLS 1.3 handshake with mutual certs (ALPN `bep/1.0`) against a stock Syncthing on the LAN, then exchange Hello.
+- [x] Port wolfSSL to xsdk with the settings above and run its tests (`wolfcrypt_test`) on the console.
+- [x] Generate an Ed25519 cert on the console and compute the device ID.
+- [x] Complete a TLS 1.3 handshake with mutual certs (ALPN `bep/1.0`) against a stock Syncthing on the LAN, then exchange Hello.
 
 ### Phase 2: BEP core (host-first)
-- [ ] Device ID, nanopb messages, framing, LZ4, Hello/ClusterConfig/Index/Request/Response/Ping/Close.
+- [x] Device ID, nanopb messages, framing, LZ4, Hello/ClusterConfig/Index/Request/Response/Ping/Close.
 - [ ] SQLite schema and index DB; the scanner with ignores; the model and version vectors; the puller with conflicts.
 - [ ] Docker interop test: a send-receive folder between the host build and stock Syncthing, both directions.
 

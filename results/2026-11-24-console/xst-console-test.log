@@ -1,0 +1,75 @@
+log: game:\xst-console-test.log
+log: named after \Device\Harddisk0\Partition1\xsyncthing\xst-console-test.xex
+log: no net_log.txt beside the .xex, so not over the network
+xst-console-test: xsyncthing v0.0.1
+------------------------------------------------------------------------------
+ wolfSSL version 5.9.4
+------------------------------------------------------------------------------
+macro    test passed!
+error    test passed!
+MEMORY   test passed!
+octets   test passed!
+base64   test passed!
+asn      test passed!
+MD5      test passed!
+SHA      test passed!
+SHA-224  test passed!
+SHA-256  test passed!
+SHA-384  test passed!
+SHA-512  test passed!
+SHA-512/224  test passed!
+SHA-512/256  test passed!
+RANDOM   test passed!
+RNGFLAG  test passed!
+RNGTHRD  test passed!
+RNGSVC   test passed!
+Hash     test passed!
+HMAC-MD5 test passed!
+HMAC-SHA test passed!
+HMAC-SHA224 test passed!
+HMAC-SHA256 test passed!
+HMAC-SHA384 test passed!
+HMAC-SHA512 test passed!
+HMAC-KDF    test passed!
+PRF         test passed!
+TLSv1.3 KDF test passed!
+GMAC     test passed!
+Chacha   test passed!
+POLY1305 test passed!
+ChaCha20-Poly1305 AEAD test passed!
+AES      test passed!
+AES192   test passed!
+AES256   test passed!
+AES-CBC  test passed!
+AES-GCM  test passed!
+RSA      test passed!
+DH       test passed!
+ECC      test passed!
+ECC buffer test passed!
+CURVE25519 test passed!
+ED25519  test passed!
+logging  test passed!
+time     test passed!
+mutex    test passed!
+memcb    test passed!
+Test complete
+wolfcrypt_test returned 0 in 54074 ms
+PASS: wolfCrypt's test suite
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\xsyncthing-test) failed: 0xC0000035
+PASS: an Ed25519 identity is generated
+generated in 1 ms; device ID HEUY6PF-QDNPBWG-YB3RM7P-2HQSNTS-MKFZ6NQ-RIT65HO-CL7KNMQ-OTHHOAA
+PASS: cert.pem and key.pem are written to hdd:
+PASS: the identity reads back with the same device ID
+PASS: a second identity has a different device ID (the RNG is live)
+this console's test device ID: A2UYUF2-54DCTXR-ZKDORXK-QYAIZLL-YUS4RL7-S7NRGLI-JN4Z2RT-JR2BWQI
+PASS: peer.txt's device ID parses
+PASS: TCP connect to 192.168.1.125:22000
+PASS: TLS 1.3 handshake with the peer
+TLS in 10 ms: TLSv1.3 TLS_AES_128_GCM_SHA256, ALPN bep/1.0
+PASS: the TLS version is 1.3
+PASS: ALPN is bep/1.0
+PASS: the peer's device ID is the one in peer.txt
+PASS: Hello exchanged
+peer Hello: device "bazzite", client syncthing v2.1.7
+checks: 12 passed, 0 failed
+exit: status 0

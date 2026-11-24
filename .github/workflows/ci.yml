@@ -14,7 +14,7 @@ jobs:
     name: host build and tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install tools
@@ -29,9 +29,9 @@ jobs:
     name: console build (.xex)
     runs-on: ubuntu-24.04
     env:
-      XSDK_TOOLCHAIN: ${{ github.workspace }}/../xsdk-gcc
+      XSDK_TOOLCHAIN: /home/runner/xsdk-gcc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install tools
@@ -43,7 +43,7 @@ jobs:
         # The toolchain only changes when xsdk's toolchain script or patches change.
         run: echo "hash=${{ hashFiles('third_party/xsdk/tools/toolchain/**') }}" >> "$GITHUB_OUTPUT"
       - name: Cache toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.XSDK_TOOLCHAIN }}
           key: xsdk-gcc-${{ runner.os }}-${{ steps.key.outputs.hash }}
@@ -51,10 +51,12 @@ jobs:
         run: scripts/bootstrap.sh
       - name: Build xsyncthing.xex
         run: scripts/build-xex.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: xsyncthing-xex
-          path: build-xsdk/xsyncthing.xex
+          path: |
+            build-xsdk/xsyncthing.xex
+            build-xsdk/xst-console-test.xex
           if-no-files-found: error
 
   release:
@@ -65,10 +67,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: xsyncthing-xex
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" xsyncthing.xex --repo "$GITHUB_REPOSITORY" --generate-notes --prerelease
+        run: gh release create "$GITHUB_REF_NAME" xsyncthing.xex xst-console-test.xex --repo "$GITHUB_REPOSITORY" --generate-notes --prerelease

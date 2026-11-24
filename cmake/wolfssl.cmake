@@ -33,4 +33,7 @@ target_compile_options(xst_wolfcrypt_test PRIVATE -w)
 if(XSDK)
 	# xsdk's GCC defines __unix__, which turns on the RNG lock tests that need pipe(); the console has none.
 	target_compile_options(xst_wolfcrypt_test PRIVATE -U__unix__ -U__unix)
+	# The suite's keys and certificates built in, not read from ./certs (which isn't beside the .xex).
+	target_compile_definitions(xst_wolfcrypt_test PRIVATE NO_FILESYSTEM USE_CERT_BUFFERS_2048 USE_CERT_BUFFERS_256
+		USE_CERT_BUFFERS_25519)
 endif()

@@ -6,6 +6,8 @@
 #include <format>
 #include <string>
 
+#include <sys/stat.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
@@ -56,10 +58,26 @@ std::string address_text()
 	return text;
 }
 
+// For automated runs (tools/xbdm.py): with game:\autoexit.txt present, the title ends by itself after this many
+// frames, so its log is closed and can be fetched.
+constexpr uint32_t kAutoExitFrames = 300;
+
+bool auto_exit_requested()
+{
+	struct stat st;
+	return stat("game:/autoexit.txt", &st) == 0;
+}
+
 void run(uint32_t width, uint32_t height)
 {
 	std::string address = address_text();
+	const bool auto_exit = auto_exit_requested();
 	for (uint32_t frame = 0;; frame++) {
+		if (auto_exit && frame >= kAutoExitFrames) {
+			xsdk_log_write("xsyncthing: address %s", address.c_str());
+			check("xsyncthing: presented frames until autoexit", true);
+			return;
+		}
 		INPUT_STATE input = {};
 		if (XamInputGetState(0, 0, &input) == ERROR_SUCCESS && input.gamepad.buttons & INPUT_GAMEPAD_BACK)
 			return;

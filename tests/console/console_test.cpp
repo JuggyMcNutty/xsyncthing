@@ -78,14 +78,26 @@ std::optional<xst::Identity> test_identity()
 		return std::nullopt;
 	}
 	xsdk_log_write("generated in %lld ms; device ID %s", static_cast<long long>(ms), id->id.to_string().c_str());
+	// The test's own round trip, in a scratch pair of files.
 	check("cert.pem and key.pem are written to hdd:",
-		write_file(dir + "/cert.pem", id->cert_pem()) && write_file(dir + "/key.pem", id->key_pem()));
-	const auto back = xst::Identity::from_pem(read_file(dir + "/cert.pem"), read_file(dir + "/key.pem"), &error);
+		write_file(dir + "/new-cert.pem", id->cert_pem()) && write_file(dir + "/new-key.pem", id->key_pem()));
+	const auto back =
+		xst::Identity::from_pem(read_file(dir + "/new-cert.pem"), read_file(dir + "/new-key.pem"), &error);
 	check("the identity reads back with the same device ID", back && back->id == id->id);
 	// A second identity must differ: the RNG isn't constant (in Xenia it is, and this fails there).
 	auto other = xst::Identity::generate(&error);
 	check("a second identity has a different device ID (the RNG is live)", other && other->id != id->id);
-	return id;
+
+	// The identity the handshake uses stays the same from run to run (cert.pem/key.pem, made once), so a peer
+	// told our device ID once keeps accepting us.
+	auto kept = xst::Identity::from_pem(read_file(dir + "/cert.pem"), read_file(dir + "/key.pem"), &error);
+	if (!kept) {
+		write_file(dir + "/cert.pem", id->cert_pem());
+		write_file(dir + "/key.pem", id->key_pem());
+		kept = id;
+	}
+	xsdk_log_write("this console's test device ID: %s", kept->id.to_string().c_str());
+	return kept;
 }
 
 void test_handshake(const xst::Identity &identity)
