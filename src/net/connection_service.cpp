@@ -239,6 +239,12 @@ void ConnectionService::stop()
 			listener_ptr_->shutdown();
 	}
 	dial_cv_.notify_all();
+	{
+		// Wake every connection, whatever stage it's at; their threads then end.
+		std::lock_guard lock(active_mu_);
+		for (auto *s : active_)
+			s->interrupt();
+	}
 	if (listener_.joinable())
 		listener_.join();
 	if (dialer_.joinable())
@@ -328,6 +334,23 @@ void ConnectionService::accept_stream(std::unique_ptr<Stream> stream, const std:
 void ConnectionService::run_connection(std::unique_ptr<Stream> stream, std::string address, std::string type,
 	TlsOptions::Role role, std::optional<DeviceId> expected)
 {
+	// Registered until this returns, so stop() can interrupt it at any stage (handshake, Hello, or running).
+	Stream *raw = stream.get();
+	{
+		std::lock_guard lock(active_mu_);
+		if (stopping_)
+			return;
+		active_.insert(raw);
+	}
+	struct Unregister {
+		ConnectionService *self;
+		Stream *raw;
+		~Unregister()
+		{
+			std::lock_guard lock(self->active_mu_);
+			self->active_.erase(raw);
+		}
+	} unregister{ this, raw };
 	std::string error;
 	auto tls = TlsConnection::handshake(std::move(stream), bep_tls_options(identity_, role), &error);
 	if (!tls) {
@@ -362,6 +385,8 @@ void ConnectionService::run_connection(std::unique_ptr<Stream> stream, std::stri
 	if (model_.is_connected(remote) && role == TlsOptions::Role::client) {
 		return; // already connected the other way
 	}
+	if (stopping_)
+		return;
 	const nlohmann::json dcfg = config_.device(remote);
 	bep::CompressionPolicy policy = bep::CompressionPolicy::metadata;
 	const std::string comp = dcfg.is_null() ? "metadata" : dcfg.value("compression", "metadata");
@@ -376,6 +401,8 @@ void ConnectionService::run_connection(std::unique_ptr<Stream> stream, std::stri
 	platform::log("connections: connected to " + remote.short_string() + " (" + hello->device_name + ", " +
 		hello->client_name + " " + hello->client_version + ") at " + address + " " + type);
 	model_.connected(peer, hello->device_name, hello->client_name, hello->client_version);
+	if (stopping_)
+		peer->close("shutting down");
 	const std::string why = peer->run(model_);
 	platform::log("connections: " + remote.short_string() + " disconnected: " + why);
 	model_.disconnected(remote, why);

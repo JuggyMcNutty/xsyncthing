@@ -211,6 +211,15 @@ def main():
             print("  A's remote need for B:", json.dumps(http(
                 key, "GET", f"/rest/db/remoteneed?folder=interop&device={bid}"))[:800])
         check("A reports B 100% complete", ok)
+        # 7. B stops quickly while connected (the console's watchdog gives it 15 s).
+        t = time.time()
+        pb.send_signal(signal.SIGTERM)
+        try:
+            pb.wait(15)
+            procs.remove(pb)
+            check(f"B stops within 15 s while connected ({time.time() - t:.1f} s)", True)
+        except subprocess.TimeoutExpired:
+            check("B stops within 15 s while connected", False)
     finally:
         for p in procs:
             try:

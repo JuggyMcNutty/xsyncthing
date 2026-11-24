@@ -3,6 +3,7 @@
 #include <atomic>
 #include <functional>
 #include <map>
+#include <set>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -68,6 +69,9 @@ private:
 	std::vector<std::thread> conn_threads_;
 	std::mutex dial_mu_;
 	std::condition_variable dial_cv_;
+	// Every stream with a connection running on it (handshaking or connected), so stop() can wake them all.
+	std::mutex active_mu_;
+	std::set<Stream *> active_;
 	std::mutex listener_mu_;
 	class TcpListener *listener_ptr_ = nullptr;
 };

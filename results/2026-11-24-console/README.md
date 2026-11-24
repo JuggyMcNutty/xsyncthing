@@ -51,3 +51,29 @@ Fixed by:
 - a 15 s watchdog on stopping
 
 **Not covered on hardware:** exFAT. No exFAT drive was on hand. Its rules (255-byte names, no 4 GB limit) are unit-tested on the host.
+
+## Phase 3: LAN sync between the console and a PC (step 13)
+
+| Side | Setup |
+|---|---|
+| Console | `xsyncthing.xex`, the daemon, folder `lan` at `hdd:/xsyncthing/folders/lan` (FATX), static address of the PC |
+| PC | stock Syncthing v2.1.7 at 192.168.1.125:22301 (`tests/console/lan_setup.py`) |
+
+What passed:
+- The PC's files reach the console: `docs/random.bin` (3 MB) is byte-identical, and `hello.txt` arrives.
+- A file written on the console reaches the PC.
+- Deletions go both ways.
+- An edit on the PC reaches the console.
+- The PC reports 100% completion for the console.
+- On a clean stop, the PC sees the console disconnect.
+
+`tests/console/lan_check.py` checked the run: 6/6.
+
+**Bugs this run found, now fixed:**
+1. **A name too long for FATX was deleted on the PC.** It was recorded as unsupported. The next scan found it missing
+   on disk and announced a deletion. Fixed: unsupported and ignored entries are skipped by the deletion pass. Now
+   covered by a unit regression test and an interop check with `--fatx`.
+2. **Recording an entry as unsupported wasn't announced to peers.** So the PC never showed 100%. Fixed.
+3. **Stopping waited forever on a connection mid-handshake, and the 15 s watchdog ended the title.** Now every live
+   stream is interrupted on stop: the daemon stops in 100 ms while connected.
+4. **`config.json` was kept open while rewriting it.** FATX refuses to replace an open file. Fixed.

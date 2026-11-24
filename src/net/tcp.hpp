@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -16,6 +17,7 @@ public:
 	long read(std::span<uint8_t> buffer) override;
 	long write(std::span<const uint8_t> data) override;
 	void close() override;
+	void interrupt() override;
 	int fd() const { return fd_; }
 
 	// Connects to host:port (a dotted IPv4 address or a name) within timeout_ms; nullptr and error on failure.
@@ -23,7 +25,7 @@ public:
 		int timeout_ms = 10000);
 
 private:
-	int fd_ = -1;
+	std::atomic<int> fd_{ -1 };
 };
 
 // A listening IPv4 TCP socket.

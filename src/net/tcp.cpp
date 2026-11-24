@@ -34,13 +34,19 @@ long TcpStream::write(std::span<const uint8_t> data)
 	}
 }
 
+void TcpStream::interrupt()
+{
+	const int fd = fd_;
+	if (fd >= 0)
+		::shutdown(fd, SHUT_RDWR);
+}
+
 void TcpStream::close()
 {
 	// Shut down first so a recv() blocked in another thread (the reader) returns; then release the socket.
-	const int fd = fd_;
+	const int fd = fd_.exchange(-1);
 	if (fd >= 0) {
 		::shutdown(fd, SHUT_RDWR);
-		fd_ = -1;
 		::close(fd);
 	}
 }

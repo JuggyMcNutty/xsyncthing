@@ -20,6 +20,9 @@ public:
 	virtual long read(std::span<uint8_t> buffer) = 0;
 	virtual long write(std::span<const uint8_t> data) = 0;
 	virtual void close() = 0;
+	// Wakes a read or write blocked in another thread (which then fails) without releasing the stream; safe to call
+	// from any thread while the stream is in use.
+	virtual void interrupt() {}
 };
 
 struct TlsOptions {
