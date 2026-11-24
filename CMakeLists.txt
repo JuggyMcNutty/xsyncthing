@@ -18,14 +18,21 @@ configure_file(src/core/version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/xst/
 
 include(cmake/wolfssl.cmake)
 
+# LZ4 (third_party/lz4, pinned tag): BEP's message compression.
+add_library(xst_lz4 STATIC third_party/lz4/lib/lz4.c)
+target_include_directories(xst_lz4 SYSTEM PUBLIC third_party/lz4/lib)
+
 # The portable core: no xsdk calls, builds on the host and the console alike.
 add_library(xst_core STATIC
 	src/core/base32.cpp
+	src/core/bep.cpp
+	src/core/bep_frame.cpp
 	src/core/device_id.cpp
 	src/core/hello.cpp
 	src/core/protowire.cpp
 	src/core/sha256.cpp
 	src/core/version.cpp
+	src/net/bep_connection.cpp
 	src/net/bep_handshake.cpp
 	src/net/identity.cpp
 	src/net/tcp.cpp
@@ -33,7 +40,7 @@ add_library(xst_core STATIC
 )
 target_include_directories(xst_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_options(xst_core PRIVATE ${XST_WARNINGS})
-target_link_libraries(xst_core PUBLIC xst_wolfssl)
+target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4)
 
 if(XSDK)
 	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp)

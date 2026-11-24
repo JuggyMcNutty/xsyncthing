@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "core/version.hpp"
+#include "net/bep_connection.hpp"
 #include "net/bep_handshake.hpp"
 #include "net/identity.hpp"
 #include "net/tcp.hpp"
@@ -94,5 +95,35 @@ int main(int argc, char **argv)
 	}
 	std::printf("peer Hello:     device \"%s\", client %s %s, %d connections\n", theirs->device_name.c_str(),
 		theirs->client_name.c_str(), theirs->client_version.c_str(), theirs->num_connections);
+
+	// Then BEP proper: send an empty ClusterConfig and print what the peer sends for a few messages.
+	xst::BepConnection bep(std::move(tls), xst::bep::CompressionPolicy::metadata);
+	if (!bep.send(xst::bep::ClusterConfig{})) {
+		std::fprintf(stderr, "sending ClusterConfig failed\n");
+		return 1;
+	}
+	for (int i = 0; i < 1; i++) {
+		const auto message = bep.receive(&error);
+		if (!message) {
+			std::fprintf(stderr, "receive: %s\n", error.c_str());
+			return 1;
+		}
+		if (const auto *cc = std::get_if<xst::bep::ClusterConfig>(&*message)) {
+			std::printf("peer ClusterConfig: %zu folders\n", cc->folders.size());
+			for (const auto &f : cc->folders)
+				std::printf("  folder %s \"%s\" (%zu devices)\n", f.id.c_str(), f.label.c_str(), f.devices.size());
+			bep.send(xst::bep::Ping{});
+		} else if (const auto *idx = std::get_if<xst::bep::Index>(&*message)) {
+			std::printf("peer Index for %s: %zu files\n", idx->folder.c_str(), idx->files.size());
+			for (const auto &f : idx->files)
+				std::printf("  %s (%lld bytes, %zu blocks)\n", f.name.c_str(), static_cast<long long>(f.size),
+					f.blocks.size());
+		} else {
+			std::printf("peer message type %d\n", static_cast<int>(xst::bep::type_of(*message)));
+		}
+		if (i == 0 && argc > 5)
+			break;
+	}
+	bep.close("xst-handshake done");
 	return 0;
 }
