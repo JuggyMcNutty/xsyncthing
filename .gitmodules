@@ -7,3 +7,9 @@
 [submodule "third_party/lz4"]
 	path = third_party/lz4
 	url = https://github.com/lz4/lz4
+[submodule "third_party/imgui"]
+	path = third_party/imgui
+	url = https://github.com/xenosworks/imgui-xenon
+[submodule "third_party/qrcodegen"]
+	path = third_party/qrcodegen
+	url = https://github.com/nayuki/QR-Code-generator

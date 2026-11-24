@@ -129,3 +129,37 @@ in both directions:
 **Note on an interrupted run:** a USB stick with its own `launch.ini` was plugged in. DashLaunch reads USB first, so
 the console booted FSD3 rather than returning to the stock dashboard. That run's 60 s delay came from that, not from
 xsyncthing. Unplugging the stick restored normal behaviour.
+
+## Phase 6: the console UI (steps 21–24)
+
+`xsyncthing.xex` now draws a controller-driven UI with Dear ImGui (imgui-xenon), at 720p inside the title-safe area.
+It has seven screens:
+- Overview
+- This Device, with a QR code of the ID
+- Devices
+- Folders
+- Requests
+- Settings
+- Log
+
+With `shot.txt` beside the `.xex`, the title stepped through every screen by sending itself RB and saved each frame
+from the front buffer. Those captures are in `docs/img/console/`:
+- The QR code in the captured frame decodes (OpenCV) to the console's device ID,
+  `SDHOS53-TTPHFBT-6SBF6IS-2QQKVNK-DR472SD-DV6KBTG-ZCLX3NU-DYNZZA4`.
+- The screens show the live state: the LAN test folder Up to Date, the PC connected (`tcp-client`, syncthing v2.1.7),
+  the joined relay, and the Web GUI URL (`https://192.168.1.118:8384/`, with a no-password warning).
+- 7/7 checks passed, and the daemon stopped cleanly afterwards.
+
+On the host, `xst-ui-shots` renders the same UI code with a software rasterizer and drives it with simulated gamepad
+input, 13/13 checks:
+- LB and RB reach every screen and wrap around.
+- Y opens Add a device; B closes it.
+- The D-pad focuses items.
+- Holding Back quits.
+
+**One source of truth (step 24):** `src/ui/view.cpp` reads only `Model`/`Config` snapshots and changes them only
+through the same calls the REST API makes. The unit test `ui_and_api_share_one_model` checks:
+- a device added in the UI appears in `/rest/config`
+- a rename through the API shows in the UI
+- a pause through the API shows in the UI
+- a password set in the UI is bcrypt in `config.gui`

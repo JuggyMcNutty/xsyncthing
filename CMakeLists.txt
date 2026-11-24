@@ -33,6 +33,18 @@ if(XSDK)
 	target_include_directories(xst_sqlite PRIVATE third_party/sqlite)
 endif()
 
+# Dear ImGui (third_party/imgui: imgui-xenon, upstream ImGui with an xsdk backend) and Nayuki's QR code generator,
+# for the console UI. The UI code itself is portable; the host build renders it in software for screenshot tests.
+set(XST_IMGUI third_party/imgui)
+add_library(xst_imgui STATIC ${XST_IMGUI}/imgui.cpp ${XST_IMGUI}/imgui_draw.cpp ${XST_IMGUI}/imgui_tables.cpp
+	${XST_IMGUI}/imgui_widgets.cpp third_party/qrcodegen/cpp/qrcodegen.cpp)
+target_include_directories(xst_imgui SYSTEM PUBLIC ${XST_IMGUI} ${XST_IMGUI}/backends third_party/qrcodegen/cpp)
+target_compile_definitions(xst_imgui PUBLIC IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
+target_compile_options(xst_imgui PRIVATE -w)
+if(XSDK)
+	target_sources(xst_imgui PRIVATE ${XST_IMGUI}/backends/imgui_impl_xsdk.cpp)
+endif()
+
 # LZ4 (third_party/lz4, pinned tag): BEP's message compression.
 add_library(xst_lz4 STATIC third_party/lz4/lib/lz4.c)
 target_include_directories(xst_lz4 SYSTEM PUBLIC third_party/lz4/lib)
@@ -69,6 +81,8 @@ add_library(xst_core STATIC
 	src/net/local_discovery.cpp
 	src/net/relay.cpp
 	src/platform/log_ring.cpp
+	src/ui/console_ui.cpp
+	src/ui/view.cpp
 	src/net/tcp.cpp
 	src/net/tls.cpp
 )
@@ -77,7 +91,7 @@ target_include_directories(xst_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/gene
 target_include_directories(xst_core SYSTEM PUBLIC third_party/include)
 target_compile_options(xst_core PRIVATE ${XST_WARNINGS})
 target_compile_definitions(xst_core PRIVATE XST_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite)
+target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite xst_imgui)
 # The posix filesystem backend serves both builds (xsdk maps POSIX file calls onto its drives).
 target_sources(xst_core PRIVATE src/platform/posix/fs_posix.cpp)
 
@@ -109,6 +123,10 @@ else()
 	add_executable(xst-handshake tools/handshake.cpp)
 	target_link_libraries(xst-handshake PRIVATE xst_core xst_platform)
 	target_compile_options(xst-handshake PRIVATE ${XST_WARNINGS})
+
+	find_package(ZLIB REQUIRED)
+	add_executable(xst-ui-shots tools/ui_shots.cpp src/app.cpp src/services.cpp)
+	target_link_libraries(xst-ui-shots PRIVATE xst_platform xst_core xst_platform ZLIB::ZLIB)
 
 	add_executable(xst-lookup tools/discovery_lookup.cpp)
 	target_link_libraries(xst-lookup PRIVATE xst_platform xst_core xst_platform)

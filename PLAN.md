@@ -133,7 +133,7 @@ xsyncthing/
 - [x] HTTP server, API key, CSRF, `/rest/events` long-polling.
 - [x] The endpoint subset the GUI uses, one endpoint at a time.
 - [x] Optional HTTPS with an ECDSA-P256 cert.
-- [ ] Unsupported features (`system/upgrade`, `svc/report`, browse on symlinks, …) return safe stubs.
+- [x] Unsupported features (`system/upgrade`, `svc/report`, browse on symlinks, …) return safe stubs.
 - [ ] GUI listens on the LAN; the console UI shows its address and API key/password.
 
 ### Phase 6: Console UI (ImGui)

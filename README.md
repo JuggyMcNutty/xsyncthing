@@ -8,18 +8,22 @@ Syncthing running on PCs, phones and servers.
 > affiliated with or endorsed by the Syncthing Foundation. It is not affiliated with or endorsed by Microsoft either.
 > Xbox and Xbox 360 are trademarks of Microsoft.
 
+![The console UI on an Xbox 360](docs/img/console/ui-6.png)
+
 ## Status
 
-**Pre-alpha. Nothing syncs yet.** See [PLAN.md](PLAN.md) for the roadmap and its progress.
+**Alpha.** xsyncthing syncs with stock Syncthing on a real JTAG Xbox 360. Everything below was verified on hardware
+(`results/`) and is tested against stock Syncthing v2.1.7 in CI (`tests/interop`). See [PLAN.md](PLAN.md) and
+[docs/COMPAT.md](docs/COMPAT.md).
 
 | Area | State |
 |---|---|
-| Repo, toolchain bootstrap, CI | in progress |
-| TLS 1.3 + Ed25519 (wolfSSL port) | planned |
-| BEP sync core | planned |
-| Local / global discovery, relays | planned |
-| REST API + stock Web GUI | planned |
-| Console UI (controller) | planned |
+| TLS 1.3 + Ed25519 (wolfSSL port) | done; verified on the console |
+| BEP sync: send & receive, conflicts, ignores | done; interop tests with stock Syncthing |
+| Storage: FATX hard disk, FAT32 USB | done; verified on the console (exFAT not yet) |
+| Local discovery, global discovery, relays | done; verified on the console |
+| REST API + stock Web GUI (HTTP/HTTPS) | done; the GUI runs from the console |
+| Console UI (controller, QR code pairing) | done; verified on the console |
 
 ## Goals for v1
 
