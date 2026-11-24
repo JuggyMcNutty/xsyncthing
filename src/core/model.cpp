@@ -8,6 +8,7 @@
 #include "core/scanner.hpp"
 #include "core/sha256.hpp"
 #include "core/vector.hpp"
+#include "platform/platform.hpp"
 
 namespace xst {
 
@@ -254,6 +255,7 @@ void Model::folder_loop(const std::string &id)
 		f->fs->mkdir(marker);
 
 	const auto rules = f->fs->rules();
+	bool first_scan = true;
 	while (!f->cancel) {
 		bool do_scan, do_pull;
 		std::vector<std::string> subdirs;
@@ -292,6 +294,10 @@ void Model::folder_loop(const std::string &id)
 			o.mtime_window_ns = std::max<int64_t>(rules.mtime_window_ns,
 				static_cast<int64_t>(f->cfg.value("modTimeWindowS", 0)) * 1000000000LL);
 			o.cancel = &f->cancel;
+			// Nothing can be mid-pull on the first scan after a start: every temp file is a leftover.
+			int64_t temps = 0;
+			o.temp_lifetime_s = first_scan ? 0 : static_cast<int64_t>(config_.options().value("keepTemporariesH", 24)) * 3600;
+			o.temps_removed = &temps;
 			o.on_changes = [&](const std::vector<bep::FileInfo> &changed) { emit_disk_changes(id, changed, true); };
 			o.progress = [&](int64_t hashed) {
 				std::lock_guard lock(mu_);
@@ -313,6 +319,10 @@ void Model::folder_loop(const std::string &id)
 				std::lock_guard lock(mu_);
 				f->state.last_scan = rfc3339_now();
 			}
+			if (temps > 0)
+				platform::log("model: " + id + ": removed " + std::to_string(temps) + " leftover temporary file" +
+					(temps == 1 ? "" : "s"));
+			first_scan = false;
 			events_.log("FolderScanProgress", { { "folder", id }, { "current", r.hashed_bytes },
 												   { "total", r.hashed_bytes }, { "rate", 0 } });
 			if (r.changed > 0) {
@@ -338,6 +348,7 @@ void Model::folder_loop(const std::string &id)
 				o.ignore_permissions = f->cfg.value("ignorePerms", false) || !rules.keeps_permissions;
 				o.max_conflicts = f->cfg.value("maxConflicts", 10);
 				o.max_name_bytes = rules.max_name_bytes;
+				o.fsync = !f->cfg.value("disableFsync", false);
 				o.cancel = &f->cancel;
 				o.on_pulled = [&](const bep::FileInfo &f) { emit_disk_changes(id, { f }, false); };
 				o.on_item = [&](const std::string &name, const std::string &err) {

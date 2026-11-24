@@ -60,8 +60,17 @@ public:
 	void each_global(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn);
 	// Local files with sequence > after, in sequence order: what to send a peer in an index update.
 	void local_since(const std::string &folder, int64_t after, const std::function<bool(const bep::FileInfo &)> &fn);
-	// Names where the global version is newer than ours (or we lack it), with the global file: what to pull.
-	void each_needed(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn);
+	// Names where the global version is newer than ours (or we lack it), with the global file: what to pull. Reads
+	// in pages of `page` rows, so a folder with many needed files doesn't sit in memory at once.
+	void each_needed(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn,
+		size_t page = 1000);
+	// A local block with this hash, to copy instead of fetching: (file name, offset, size).
+	struct BlockRef {
+		std::string name;
+		int64_t offset = 0;
+		int32_t size = 0;
+	};
+	std::optional<BlockRef> find_local_block(const std::string &folder, std::span<const uint8_t> hash);
 	// Global files the device lacks or has older (deletions only where it still has the file).
 	void each_remote_needed(const std::string &folder, const DeviceId &device,
 		const std::function<bool(const bep::FileInfo &)> &fn);

@@ -134,14 +134,14 @@ xsyncthing/
 - [x] The endpoint subset the GUI uses, one endpoint at a time.
 - [x] Optional HTTPS with an ECDSA-P256 cert.
 - [x] Unsupported features (`system/upgrade`, `svc/report`, browse on symlinks, …) return safe stubs.
-- [ ] GUI listens on the LAN; the console UI shows its address and API key/password.
+- [x] GUI listens on the LAN; the console UI shows its address and API key/password.
 
 ### Phase 6: Console UI (ImGui)
-- [ ] Screens: dashboard (folders and devices with progress), device ID with QR code, add or accept a device, add or
+- [x] Screens: dashboard (folders and devices with progress), device ID with QR code, add or accept a device, add or
   share a folder (device and path picker), pending requests, folder errors, settings (GUI on/off, listen address,
   discovery and relays), logs.
-- [ ] 720p, safe-area margins, A/B/X/Y and the D-pad with focus navigation, XAM keyboard for text fields.
-- [ ] The UI only reads the same in-process model the REST API uses; there's no second source of truth.
+- [x] 720p, safe-area margins, A/B/X/Y and the D-pad with focus navigation, XAM keyboard for text fields.
+- [x] The UI only reads the same in-process model the REST API uses; there's no second source of truth.
 
 ### Phase 7: Hardening and release
 - [ ] Memory limits and soak tests (large folders, about 100k files); throughput tuning

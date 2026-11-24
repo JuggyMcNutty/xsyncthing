@@ -5,6 +5,7 @@
 | `run.py` | Sync with stock Syncthing v2.1.7 on loopback, summarized below |
 | `api_check.py` | The REST API as the stock Web GUI uses it, summarized below: 42 checks |
 | `api_compare.py` | Response shape for every endpoint the GUI uses, against stock Syncthing sharing the same folder (38 endpoints, every key and JSON type) |
+| `crash_check.py` | Recovery after a crash: xsyncthing is killed with SIGKILL mid-pull three times. Each restart must reopen its database and config and clean up temp files; the sync then finishes byte for byte, with no conflict copies |
 | `gui_check.py` | The stock Web GUI in headless Chromium (Playwright), summarized below |
 
 `run.py` checks:

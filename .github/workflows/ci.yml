@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14 zlib1g-dev
       - name: Build and test
         env:
           CC: gcc-14
@@ -33,7 +33,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14 zlib1g-dev
       - name: Build
         env:
           CC: gcc-14
@@ -51,6 +51,16 @@ jobs:
           tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --relay "$RELAY" --relay-inbound --work /tmp/xst-interop-relay-in
       - name: Interop (FATX rules)
         run: tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --fatx --work /tmp/xst-interop-fatx
+      - name: Recovery after crashes mid-pull (SIGKILL three times)
+        run: tests/interop/crash_check.py --syncthing "$ST" --xsyncthing build-host/xsyncthing
+      - name: Soak, 100k files
+        run: |
+          mkdir -p /tmp/xst-soak
+          build-host/xst-soak /tmp/xst-soak 100000
+      - name: Console UI, rendered in software and driven by a simulated gamepad
+        run: |
+          mkdir -p /tmp/xst-ui/docs /tmp/xst-ui-shots
+          build-host/xst-ui-shots /tmp/xst-ui /tmp/xst-ui-shots
       - name: REST API compared with stock Syncthing's, endpoint by endpoint
         run: tests/interop/api_compare.py --syncthing "$ST" --xsyncthing build-host/xsyncthing
       - name: REST API as the Web GUI uses it
@@ -63,8 +73,10 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: webgui-screenshots
-          path: /tmp/xst-gui*.png
+          name: screenshots
+          path: |
+            /tmp/xst-gui*.png
+            /tmp/xst-ui-shots/*.png
           if-no-files-found: ignore
       - name: Logs
         if: failure()

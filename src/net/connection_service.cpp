@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <deque>
 #include <map>
 
 #include <arpa/inet.h>
@@ -133,6 +134,20 @@ public:
 	// The reader loop; returns why it ended.
 	std::string run(Model &model)
 	{
+		std::thread worker([this, &model] {
+			for (;;) {
+				bep::Message m;
+				{
+					std::unique_lock lock(queue_mu_);
+					queue_cv_.wait(lock, [&] { return !queue_.empty() || worker_stop_; });
+					if (queue_.empty())
+						return;
+					m = std::move(queue_.front());
+					queue_.pop_front();
+				}
+				model.handle(device_, m);
+			}
+		});
 		std::thread pinger([this] {
 			while (!closed_) {
 				std::unique_lock lock(ping_mu_);
@@ -178,11 +193,25 @@ public:
 				std::thread([self, &model, req] { model.handle(self->device_, req); }).detach();
 				continue;
 			}
-			model.handle(device_, *m);
+			// Everything else (ClusterConfig, Index, IndexUpdate, ...) goes to this connection's worker, in order.
+			// Never on the reader thread: handling an index waits for the database, which a running pull holds
+			// while it waits for Responses that only this thread delivers (tests/interop/crash_check.py found it).
+			{
+				std::lock_guard lock(queue_mu_);
+				queue_.push_back(std::move(*m));
+			}
+			queue_cv_.notify_one();
 		}
 		closed_ = true;
 		ping_cv_.notify_all();
 		pinger.join();
+		{
+			// Let the worker finish what's queued (the index we got before the connection ended), then stop.
+			std::lock_guard lock(queue_mu_);
+			worker_stop_ = true;
+		}
+		queue_cv_.notify_all();
+		worker.join();
 		{
 			std::lock_guard lock(mu_);
 			for (auto &[id, w] : waiting_) {
@@ -212,6 +241,10 @@ private:
 	std::map<int32_t, std::shared_ptr<Waiter>> waiting_;
 	std::mutex ping_mu_;
 	std::condition_variable ping_cv_;
+	std::mutex queue_mu_;
+	std::condition_variable queue_cv_;
+	std::deque<bep::Message> queue_;
+	bool worker_stop_ = false;
 };
 
 } // namespace

@@ -2,7 +2,9 @@
 
 #include <cstring>
 #include <random>
+#include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 
 #include <sqlite3.h>
 
@@ -34,6 +36,15 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS files_seq ON files (folder, device, sequence);
 CREATE INDEX IF NOT EXISTS files_name ON files (folder, name);
 CREATE INDEX IF NOT EXISTS files_need ON files (folder, need) WHERE need = 1;
+CREATE TABLE IF NOT EXISTS blocks (
+	folder TEXT NOT NULL,
+	hash BLOB NOT NULL,
+	name TEXT NOT NULL,
+	offset INTEGER NOT NULL,
+	size INTEGER NOT NULL,
+	PRIMARY KEY (folder, hash, name, offset)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS blocks_name ON blocks (folder, name);
 CREATE TABLE IF NOT EXISTS index_ids (
 	folder TEXT NOT NULL,
 	device BLOB NOT NULL,
@@ -50,14 +61,69 @@ CREATE TABLE IF NOT EXISTS kv (
 ) WITHOUT ROWID;
 )SQL";
 
+// Prepared statements, cached per connection by their SQL text (the same pointer: every call site passes a literal).
+// Preparing dominated scans and pulls of many small files (tools/soak.cpp); now each statement is prepared once.
+struct StmtCache {
+	std::mutex mu;
+	std::unordered_map<sqlite3 *, std::unordered_map<const char *, sqlite3_stmt *>> by_db;
+	std::unordered_map<sqlite3_stmt *, bool> in_use;
+};
+StmtCache &stmt_cache()
+{
+	static StmtCache c;
+	return c;
+}
+
 struct Stmt {
 	sqlite3_stmt *s = nullptr;
+	bool cached = false;
 	Stmt(sqlite3 *db, const char *sql)
 	{
-		if (sqlite3_prepare_v2(db, sql, -1, &s, nullptr) != SQLITE_OK)
+		auto &c = stmt_cache();
+		{
+			std::lock_guard lock(c.mu);
+			auto &m = c.by_db[db];
+			auto it = m.find(sql);
+			// A statement already in use (a nested query with the same SQL) gets a fresh one of its own.
+			if (it != m.end() && !c.in_use[it->second]) {
+				s = it->second;
+				c.in_use[s] = true;
+				cached = true;
+				return;
+			}
+		}
+		if (sqlite3_prepare_v3(db, sql, -1, SQLITE_PREPARE_PERSISTENT, &s, nullptr) != SQLITE_OK)
 			throw std::runtime_error(std::string("sqlite prepare: ") + sqlite3_errmsg(db) + ": " + sql);
+		std::lock_guard lock(c.mu);
+		auto &m = c.by_db[db];
+		if (!m.count(sql)) {
+			m[sql] = s;
+			c.in_use[s] = true;
+			cached = true;
+		}
 	}
-	~Stmt() { sqlite3_finalize(s); }
+	~Stmt()
+	{
+		if (!cached) {
+			sqlite3_finalize(s);
+			return;
+		}
+		sqlite3_reset(s);
+		sqlite3_clear_bindings(s);
+		auto &c = stmt_cache();
+		std::lock_guard lock(c.mu);
+		c.in_use[s] = false;
+	}
+	static void finalize_all(sqlite3 *db)
+	{
+		auto &c = stmt_cache();
+		std::lock_guard lock(c.mu);
+		for (auto &[sql, st] : c.by_db[db]) {
+			c.in_use.erase(st);
+			sqlite3_finalize(st);
+		}
+		c.by_db.erase(db);
+	}
 	Stmt &text(int i, const std::string &v)
 	{
 		sqlite3_bind_text(s, i, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
@@ -162,7 +228,11 @@ std::unique_ptr<Db> Db::open(const std::string &path, std::string *error)
 	return std::unique_ptr<Db>(new Db(db));
 }
 
-Db::~Db() { sqlite3_close(db_); }
+Db::~Db()
+{
+	Stmt::finalize_all(db_);
+	sqlite3_close(db_);
+}
 
 void Db::exec(const char *sql)
 {
@@ -229,7 +299,22 @@ void Db::update(const std::string &folder, const DeviceId &device, const std::ve
 {
 	Stmt s(db_, "INSERT OR REPLACE INTO files (folder, device, name, sequence, deleted, invalid, is_dir, size, fi) "
 				"VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)");
+	const bool local = device == local_device();
 	for (const auto &f : files) {
+		if (local) {
+			// The block index (for reusing blocks we already have) follows the local files.
+			Stmt del(db_, "DELETE FROM blocks INDEXED BY blocks_name WHERE folder = ?1 AND name = ?2");
+			del.text(1, folder).text(2, f.name);
+			del.step();
+			if (!f.deleted && f.type == bep::FileInfoType::file && !is_invalid(f)) {
+				Stmt ins(db_, "INSERT OR IGNORE INTO blocks (folder, hash, name, offset, size) VALUES (?1, ?2, ?3, ?4, ?5)");
+				for (const auto &b : f.blocks) {
+					sqlite3_reset(ins.s);
+					ins.text(1, folder).blob(2, b.hash.data(), b.hash.size()).text(3, f.name).i64(4, b.offset).i64(5, b.size);
+					ins.step();
+				}
+			}
+		}
 		const auto blob = bep::encode(f);
 		sqlite3_reset(s.s);
 		s.text(1, folder)
@@ -265,7 +350,7 @@ void Db::drop_device(const std::string &folder, const DeviceId &device)
 void Db::drop_folder(const std::string &folder)
 {
 	for (const char *sql : { "DELETE FROM files WHERE folder = ?1", "DELETE FROM index_ids WHERE folder = ?1",
-			 "DELETE FROM sequences WHERE folder = ?1" }) {
+			 "DELETE FROM sequences WHERE folder = ?1", "DELETE FROM blocks WHERE folder = ?1" }) {
 		Stmt s(db_, sql);
 		s.text(1, folder);
 		s.step();
@@ -275,7 +360,7 @@ void Db::drop_folder(const std::string &folder)
 std::vector<bep::FileInfo> Db::versions(const std::string &folder, const std::string &name,
 	std::vector<DeviceId> *devices)
 {
-	Stmt s(db_, "SELECT device, fi FROM files WHERE folder = ?1 AND name = ?2");
+	Stmt s(db_, "SELECT device, fi FROM files INDEXED BY files_name WHERE folder = ?1 AND name = ?2");
 	s.text(1, folder).text(2, name);
 	std::vector<bep::FileInfo> out;
 	while (s.step()) {
@@ -316,7 +401,7 @@ void Db::recompute_global(const std::string &folder, const std::string &name)
 	// older).
 	const bool need = devices[best] != local && !is_invalid(g) &&
 		(have_local ? !local_is_current : !g.deleted);
-	Stmt clear(db_, "UPDATE files SET global = 0, need = 0 WHERE folder = ?1 AND name = ?2");
+	Stmt clear(db_, "UPDATE files INDEXED BY files_name SET global = 0, need = 0 WHERE folder = ?1 AND name = ?2");
 	clear.text(1, folder).text(2, name);
 	clear.step();
 	Stmt set(db_, "UPDATE files SET global = 1, need = ?4 WHERE folder = ?1 AND name = ?2 AND device = ?3");
@@ -335,7 +420,7 @@ std::optional<bep::FileInfo> Db::get(const std::string &folder, const DeviceId &
 
 std::optional<bep::FileInfo> Db::global(const std::string &folder, const std::string &name)
 {
-	Stmt s(db_, "SELECT fi FROM files WHERE folder = ?1 AND name = ?2 AND global = 1");
+	Stmt s(db_, "SELECT fi FROM files INDEXED BY files_name WHERE folder = ?1 AND name = ?2 AND global = 1");
 	s.text(1, folder).text(2, name);
 	if (!s.step())
 		return std::nullopt;
@@ -383,18 +468,49 @@ void Db::local_since(const std::string &folder, int64_t after, const std::functi
 			break;
 }
 
-void Db::each_needed(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn)
+void Db::each_needed(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn, size_t page)
 {
-	// Directories first (shallow to deep), then files, then deletions deepest first, as the puller wants them.
-	Stmt s(db_, "SELECT fi FROM files WHERE folder = ?1 AND need = 1 "
-				"ORDER BY deleted, is_dir DESC, CASE WHEN deleted THEN -length(name) ELSE length(name) END, name");
-	s.text(1, folder);
-	std::vector<bep::FileInfo> batch;
-	while (s.step())
-		batch.push_back(decode_row(s.col_blob(0)));
-	for (const auto &f : batch)
-		if (!fn(f))
-			break;
+	// Directories first (shallow to deep), then files, then deletions deepest first, as the puller wants them. Read a
+	// page at a time and released before fn runs, as fn may write (and pulled names stop being needed).
+	struct Key {
+		int64_t deleted, is_dir, len;
+		std::string name;
+	};
+	std::optional<Key> after;
+	for (;;) {
+		std::vector<std::pair<Key, bep::FileInfo>> batch;
+		{
+			Stmt s(db_, "SELECT deleted, is_dir, CASE WHEN deleted THEN -length(name) ELSE length(name) END AS len, "
+						"name, fi FROM files INDEXED BY files_need WHERE folder = ?1 AND need = 1 "
+						"AND (?2 = 0 OR (deleted, -is_dir, len, name) > (?3, -?4, ?5, ?6)) "
+						"ORDER BY deleted, is_dir DESC, len, name LIMIT ?7");
+			s.text(1, folder).i64(2, after ? 1 : 0);
+			if (after)
+				s.i64(3, after->deleted).i64(4, after->is_dir).i64(5, after->len).text(6, after->name);
+			else
+				s.i64(3, 0).i64(4, 0).i64(5, 0).text(6, "");
+			s.i64(7, static_cast<int64_t>(page));
+			while (s.step())
+				batch.push_back({ Key{ s.col_i64(0), s.col_i64(1), s.col_i64(2), s.col_text(3) }, decode_row(s.col_blob(4)) });
+		}
+		if (batch.empty())
+			return;
+		after = batch.back().first;
+		for (const auto &[k, f] : batch)
+			if (!fn(f))
+				return;
+		if (batch.size() < page)
+			return;
+	}
+}
+
+std::optional<Db::BlockRef> Db::find_local_block(const std::string &folder, std::span<const uint8_t> hash)
+{
+	Stmt s(db_, "SELECT name, offset, size FROM blocks WHERE folder = ?1 AND hash = ?2 LIMIT 1");
+	s.text(1, folder).blob(2, hash.data(), hash.size());
+	if (!s.step())
+		return std::nullopt;
+	return BlockRef{ s.col_text(0), s.col_i64(1), static_cast<int32_t>(s.col_i64(2)) };
 }
 
 namespace {

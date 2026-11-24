@@ -24,6 +24,11 @@ struct ScanOptions {
 	const std::atomic<bool> *cancel = nullptr;
 	// Progress: bytes hashed so far.
 	std::function<void(int64_t)> progress;
+	// Temporary files (".syncthing.*.tmp", ".st~*.tmp") older than this are removed when seen, as lib/scanner does
+	// with keepTemporariesH; 0 removes every one (the first scan after a start, when no pull can be running).
+	int64_t temp_lifetime_s = 24 * 3600;
+	// Counts what was removed.
+	int64_t *temps_removed = nullptr;
 	// Each batch of changes recorded (for LocalChangeDetected).
 	std::function<void(const std::vector<bep::FileInfo> &)> on_changes;
 };

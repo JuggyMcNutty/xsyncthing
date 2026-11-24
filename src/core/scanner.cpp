@@ -1,5 +1,6 @@
 #include "core/scanner.hpp"
 
+#include <ctime>
 #include <set>
 
 #include "core/sha256.hpp"
@@ -140,6 +141,15 @@ ScanResult scan(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 		}
 		for (const auto &e : *entries) {
 			const std::string path = fs::join(dir, e.name);
+			if (IgnoreMatcher::is_temporary(path) && e.stat.kind == fs::Kind::file) {
+				// A pull interrupted by a crash or power cut leaves its temp file; clean those up.
+				const int64_t age = static_cast<int64_t>(std::time(nullptr)) - e.stat.mtime_s;
+				if (options.temp_lifetime_s == 0 || age > options.temp_lifetime_s) {
+					if (fs.remove(path) && options.temps_removed)
+						++*options.temps_removed;
+				}
+				continue;
+			}
 			const auto ig = ignores.match(path);
 			if (ig.ignored) {
 				// Ignored names stay in the index as they were, flagged; children of a skippable dir are not walked.

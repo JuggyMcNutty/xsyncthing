@@ -28,6 +28,15 @@ struct PullOptions {
 	// The temp name for a file: upstream's ".syncthing.<name>.tmp" where it fits, else ".st~<8 hex>.tmp" (always
 	// within 42 bytes, for FATX).
 	size_t max_name_bytes = 255;
+	// fsync each file before renaming it into place (the folder's disableFsync turns it off, as upstream).
+	bool fsync = true;
+	// Where the time went (tools/soak.cpp): seconds in database calls, in fetching blocks, and in total.
+	struct Timing {
+		double db = 0, fetch = 0, needed_query = 0, total = 0;
+		// Filesystem steps of a file pull.
+		double stat = 0, mkdir = 0, create = 0, write = 0, truncate = 0, sync = 0, close = 0, mtime = 0, rename = 0;
+	};
+	Timing *timing = nullptr;
 	const std::atomic<bool> *cancel = nullptr;
 	// Wall clock for conflict names (tests pin it).
 	std::function<std::string()> conflict_timestamp;
