@@ -29,7 +29,8 @@ bool query_bool(const std::map<std::string, std::string> &p, const std::string &
 std::vector<GlobalDiscovery::Server> GlobalDiscovery::servers_from(const nlohmann::json &options)
 {
 	std::vector<std::string> raw;
-	for (const auto &s : options.value("globalAnnounceServers", nlohmann::json::array({ "default" }))) {
+	const nlohmann::json configured = options.value("globalAnnounceServers", nlohmann::json::array({ "default" }));
+	for (const auto &s : configured) {
 		const std::string v = s;
 		if (v == "default" || v == "default-v4")
 			raw.insert(raw.end(), kDefaultServers.begin(), kDefaultServers.end());
@@ -180,7 +181,8 @@ std::vector<std::string> GlobalDiscovery::lookup(const DeviceId &device)
 			continue;
 		try {
 			const auto j = nlohmann::json::parse(resp->body);
-			for (const auto &a : j.value("addresses", nlohmann::json::array()))
+			const nlohmann::json addrs = j.value("addresses", nlohmann::json::array());
+			for (const auto &a : addrs)
 				found.push_back(a.get<std::string>());
 			cache_for = kPositiveCache;
 		} catch (...) {

@@ -358,7 +358,8 @@ std::string RelayService::error() const
 std::vector<std::string> RelayService::candidates()
 {
 	std::vector<std::string> out;
-	for (const auto &a : config_.options().value("listenAddresses", nlohmann::json::array({ "default" }))) {
+	const nlohmann::json listen = config_.options().value("listenAddresses", nlohmann::json::array({ "default" }));
+	for (const auto &a : listen) {
 		const std::string s = a;
 		if (s.starts_with("relay://")) {
 			out.push_back(s);
@@ -377,7 +378,8 @@ std::vector<std::string> RelayService::candidates()
 			}
 			try {
 				std::vector<std::string> pool_relays;
-				for (const auto &r : nlohmann::json::parse(resp->body).value("relays", nlohmann::json::array()))
+				const nlohmann::json pool_json = nlohmann::json::parse(resp->body).value("relays", nlohmann::json::array());
+				for (const auto &r : pool_json)
 					pool_relays.push_back(r.value("url", ""));
 				// Upstream orders by measured latency; we try a few at random, which spreads load the same way.
 				std::shuffle(pool_relays.begin(), pool_relays.end(), std::mt19937(std::random_device{}()));

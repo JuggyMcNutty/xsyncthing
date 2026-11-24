@@ -394,7 +394,8 @@ void Model::folder_loop(const std::string &id)
 		events_.log("FolderSummary", { { "folder", id }, { "summary", folder_status(id) } });
 		// FolderCompletion for each device the folder is shared with, as lib/model/folder_summary.go does after a
 		// summary: the GUI shows remote devices' progress from these.
-		for (const auto &fd : f->cfg.value("devices", json::array())) {
+		const json fdevs = f->cfg.value("devices", json::array());
+		for (const auto &fd : fdevs) {
 			const auto did = DeviceId::parse(fd.value("deviceID", ""));
 			if (!did || *did == config_.my_id())
 				continue;

@@ -529,7 +529,8 @@ Response ApiServer::route(const Request &req)
 			id = did->to_string();
 		}
 		json current = nullptr;
-		for (const auto &x : cfg.get()[list])
+		const json all = cfg.get(); // a copy: iterating a member of the temporary would dangle
+		for (const auto &x : all[list])
 			if (x.value(key, "") == id)
 				current = x;
 		if (get)
@@ -881,7 +882,8 @@ Response ApiServer::route(const Request &req)
 			if (!j)
 				return error_response(400, "bad JSON");
 			std::vector<std::string> lines;
-			for (const auto &l : (*j).value("ignore", json::array()))
+			const json ignore_lines = (*j).value("ignore", json::array());
+			for (const auto &l : ignore_lines)
 				lines.push_back(l.get<std::string>());
 			model.set_ignores(folder, lines);
 		}

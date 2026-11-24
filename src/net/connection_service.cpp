@@ -308,7 +308,8 @@ void ConnectionService::dial_now() { dial_cv_.notify_all(); }
 void ConnectionService::listen_loop()
 {
 	uint16_t port = 22000;
-	for (const auto &a : config_.options()["listenAddresses"]) {
+	const nlohmann::json opts = config_.options(); // keep the copy alive for the loop
+	for (const auto &a : opts["listenAddresses"]) {
 		std::string s = a;
 		if (s == "default" || s.starts_with("quic") || s.starts_with("relay") || s.starts_with("dynamic"))
 			continue;
