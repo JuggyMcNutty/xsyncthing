@@ -61,10 +61,12 @@ add_library(xst_core STATIC
 	src/net/bep_handshake.cpp
 	src/net/connection_service.cpp
 	src/net/identity.cpp
+	src/net/local_discovery.cpp
 	src/net/tcp.cpp
 	src/net/tls.cpp
 )
 target_include_directories(xst_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# local_discovery is a Service of the App (src/app.hpp); app.cpp itself is linked by each main.
 target_include_directories(xst_core SYSTEM PUBLIC third_party/include)
 target_compile_options(xst_core PRIVATE ${XST_WARNINGS})
 target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite)

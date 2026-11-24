@@ -52,6 +52,10 @@ public:
 	// Builds services that need the core (called inside start(), after the model exists).
 	void on_core_ready(std::function<void(App &)> fn) { core_ready_.push_back(std::move(fn)); }
 
+	// Services the API and UI read status from (set by register_services; may be null).
+	class LocalDiscovery *local_discovery() const { return local_discovery_; }
+	void set_local_discovery(class LocalDiscovery *d) { local_discovery_ = d; }
+
 private:
 	Options options_;
 	std::optional<Identity> identity_;
@@ -63,6 +67,7 @@ private:
 	std::vector<std::unique_ptr<Service>> services_;
 	std::vector<std::function<void(App &)>> core_ready_;
 	bool started_ = false;
+	class LocalDiscovery *local_discovery_ = nullptr;
 };
 
 // Adds the optional services (discovery, relays, REST API) the build has; defined in services.cpp.

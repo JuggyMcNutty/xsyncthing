@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/syncthing/syncthing/internal/gen/bep"
+	"github.com/syncthing/syncthing/internal/gen/discoproto"
 )
 
 func out(name string, m proto.Message) {
@@ -50,5 +51,11 @@ func main() {
 	out("response_err", &bep.Response{Id: 6, Code: bep.ErrorCode_ERROR_CODE_NO_SUCH_FILE})
 	out("download_progress", &bep.DownloadProgress{Folder: "f", Updates: []*bep.FileDownloadProgressUpdate{{Name: "a", BlockIndexes: []int32{0, 1, 200}, BlockSize: 131072, Version: &bep.Vector{Counters: []*bep.Counter{{Id: 1, Value: 2}}}}}})
 	out("close", &bep.Close{Reason: "bye"})
+	did := make([]byte, 32)
+	for i := range did {
+		did[i] = byte(0x40 + i)
+	}
+	ann, _ := proto.Marshal(&discoproto.Announce{Id: did, Addresses: []string{"tcp://0.0.0.0:22000", "quic://0.0.0.0:22000", "tcp://[::]:22000", "relay://1.2.3.4:443/?id=X"}, InstanceId: 1234567890123})
+	fmt.Printf("local_announce 2ea7d90b%s\n", hex.EncodeToString(ann))
 	out("header_lz4", &bep.Header{Type: bep.MessageType_MESSAGE_TYPE_INDEX, Compression: bep.MessageCompression_MESSAGE_COMPRESSION_LZ4})
 }

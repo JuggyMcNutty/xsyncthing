@@ -77,3 +77,11 @@ What passed:
 3. **Stopping waited forever on a connection mid-handshake, and the 15 s watchdog ended the title.** Now every live
    stream is interrupted on stop: the daemon stops in 100 ms while connected.
 4. **`config.json` was kept open while rewriting it.** FATX refuses to replace an open file. Fixed.
+
+## Phase 4: local discovery (step 14)
+
+The console and the PC both have each other only as `dynamic`, and global discovery and relays are off. So the only
+way they can find each other is the IPv4 broadcast on UDP 21027:
+- The console logged `discovery: 4FX6QBR at tcp://192.168.1.125:22301` and connected.
+- The PC's `/rest/system/discovery` lists the console at `tcp://192.168.1.118:22000`.
+- The packet format matches upstream's byte for byte (unit test against `tools/golden`).

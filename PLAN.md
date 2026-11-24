@@ -122,7 +122,7 @@ xsyncthing/
 ### Phase 3: Console platform layer
 - [x] fs backends for FATX, FAT32 and exFAT, with the name and size checks; an SQLite VFS; thread placement;
   `xsdk_on_terminate` to close the DB cleanly.
-- [ ] A LAN sync test on the console against a PC (static address first).
+- [x] A LAN sync test on the console against a PC (static address first).
 
 ### Phase 4: Discovery and relays
 - [ ] Local discovery over IPv4 broadcast, sending and receiving.
