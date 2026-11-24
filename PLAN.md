@@ -101,8 +101,8 @@ xsyncthing/
 
 ## Steps
 ### Phase 0: Repo and toolchain
-- [ ] `git init`; add the skeleton above, the GPL-3.0 LICENSE and a README (unofficial, scope, status).
-- [ ] `gh repo create JuggyMcNutty/xsyncthing --public --source . --push`; set the description and topics
+- [x] `git init`; add the skeleton above, the GPL-3.0 LICENSE and a README (unofficial, scope, status).
+- [x] `gh repo create JuggyMcNutty/xsyncthing --public --source . --push`; set the description and topics
   (xbox360, syncthing, homebrew, xsdk).
 - [ ] Add xsdk as a submodule. Write a `scripts/bootstrap.sh` that runs xsdk's `tools/toolchain/build.sh` to install
   `~/xsdk-gcc`.

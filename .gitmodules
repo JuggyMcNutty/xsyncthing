@@ -1,0 +1,6 @@
+[submodule "third_party/xsdk"]
+	path = third_party/xsdk
+	url = https://github.com/xenosworks/xsdk
+[submodule "third_party/wolfssl"]
+	path = third_party/wolfssl
+	url = https://github.com/wolfSSL/wolfssl
