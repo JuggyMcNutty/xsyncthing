@@ -127,7 +127,7 @@ xsyncthing/
 ### Phase 4: Discovery and relays
 - [x] Local discovery over IPv4 broadcast, sending and receiving.
 - [x] HTTP/1.1 client; global discovery announce and query.
-- [ ] Relay client: pool lookup, join, session invites, BEP over a relay.
+- [x] Relay client: pool lookup, join, session invites, BEP over a relay.
 
 ### Phase 5: REST API and Web GUI
 - [ ] HTTP server, API key, CSRF, `/rest/events` long-polling.

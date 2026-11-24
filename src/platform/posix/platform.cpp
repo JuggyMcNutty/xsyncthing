@@ -5,7 +5,11 @@
 
 namespace xst::platform {
 
-void log(const std::string &line) { std::fprintf(stderr, "%s\n", line.c_str()); }
+void remember_log(const std::string &line);
+
+void log(const std::string &line) {
+	remember_log(line);
+	std::fprintf(stderr, "%s\n", line.c_str()); }
 
 std::string data_dir()
 {

@@ -58,6 +58,8 @@ public:
 	void set_local_discovery(class LocalDiscovery *d) { local_discovery_ = d; }
 	class GlobalDiscovery *global_discovery() const { return global_discovery_; }
 	void set_global_discovery(class GlobalDiscovery *d) { global_discovery_ = d; }
+	class ApiServer *api() const { return api_; }
+	void set_api(class ApiServer *a) { api_ = a; }
 	class RelayService *relays() const { return relays_; }
 	void set_relays(class RelayService *r) { relays_ = r; }
 	// Addresses other services want announced too (the relay we're joined to).
@@ -86,6 +88,7 @@ private:
 	class LocalDiscovery *local_discovery_ = nullptr;
 	class GlobalDiscovery *global_discovery_ = nullptr;
 	class RelayService *relays_ = nullptr;
+	class ApiServer *api_ = nullptr;
 	mutable std::mutex extra_mu_;
 	std::vector<std::string> extra_addresses_;
 };

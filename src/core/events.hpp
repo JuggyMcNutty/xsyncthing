@@ -29,6 +29,8 @@ public:
 	std::vector<Event> since(int64_t since, const std::vector<std::string> &types, std::chrono::milliseconds timeout,
 		size_t limit = 0);
 	int64_t last_id();
+	// Wakes every waiting since() now and makes later ones return at once (on shutdown).
+	void close();
 
 	static nlohmann::json to_json(const Event &e);
 
@@ -37,6 +39,7 @@ private:
 	std::condition_variable cv_;
 	std::deque<Event> buffer_;
 	int64_t next_id_ = 1;
+	bool closed_ = false;
 };
 
 std::string rfc3339_now();

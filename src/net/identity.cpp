@@ -7,6 +7,7 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
+#include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/ed25519.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/wolfcrypt/random.h>
@@ -131,6 +132,79 @@ std::optional<Identity> Identity::generate(std::string *error, const std::string
 	}
 	key_der.resize(static_cast<size_t>(ret));
 
+	Identity identity;
+	identity.cert_der = std::move(der);
+	identity.key_der = std::move(key_der);
+	identity.id = DeviceId::from_certificate(identity.cert_der);
+	return identity;
+}
+
+std::optional<Identity> Identity::generate_ecdsa_p256(std::string *error, const std::string &common_name,
+	int days_valid)
+{
+	WC_RNG rng;
+	int ret = wc_InitRng(&rng);
+	if (ret != 0) {
+		set_error(error, "wc_InitRng", ret);
+		return std::nullopt;
+	}
+	struct RngGuard {
+		WC_RNG *r;
+		~RngGuard() { wc_FreeRng(r); }
+	} rng_guard{ &rng };
+	ecc_key key;
+	wc_ecc_init(&key);
+	struct KeyGuard {
+		ecc_key *k;
+		~KeyGuard() { wc_ecc_free(k); }
+	} key_guard{ &key };
+	ret = wc_ecc_make_key_ex(&rng, 32, &key, ECC_SECP256R1);
+	if (ret != 0) {
+		set_error(error, "wc_ecc_make_key_ex", ret);
+		return std::nullopt;
+	}
+	auto cert = std::make_unique<Cert>();
+	wc_InitCert(cert.get());
+	cert->sigType = CTC_SHA256wECDSA;
+	cert->daysValid = days_valid;
+	cert->isCA = 0;
+	cert->isCaSet = 1;
+	cert->basicConstSet = 1;
+	cert->selfSigned = 1;
+	std::strncpy(cert->subject.commonName, common_name.c_str(), CTC_NAME_SIZE - 1);
+	std::strncpy(cert->subject.org, "Syncthing", CTC_NAME_SIZE - 1);
+	std::strncpy(cert->subject.unit, "Automatically Generated", CTC_NAME_SIZE - 1);
+	const auto alt = dns_alt_name(common_name);
+	std::memcpy(cert->altNames, alt.data(), alt.size());
+	cert->altNamesSz = static_cast<int>(alt.size());
+	cert->keyUsage = KEYUSE_DIGITAL_SIG | KEYUSE_KEY_ENCIPHER;
+	cert->extKeyUsage = EXTKEYUSE_SERVER_AUTH | EXTKEYUSE_CLIENT_AUTH;
+	byte serial[8];
+	wc_RNG_GenerateBlock(&rng, serial, sizeof serial);
+	serial[0] &= 0x7F;
+	if (serial[0] == 0)
+		serial[0] = 1;
+	std::memcpy(cert->serial, serial, sizeof serial);
+	cert->serialSz = sizeof serial;
+	std::vector<uint8_t> der(4096);
+	ret = wc_MakeCert(cert.get(), der.data(), static_cast<word32>(der.size()), nullptr, &key, &rng);
+	if (ret < 0) {
+		set_error(error, "wc_MakeCert", ret);
+		return std::nullopt;
+	}
+	ret = wc_SignCert(cert->bodySz, cert->sigType, der.data(), static_cast<word32>(der.size()), nullptr, &key, &rng);
+	if (ret < 0) {
+		set_error(error, "wc_SignCert", ret);
+		return std::nullopt;
+	}
+	der.resize(static_cast<size_t>(ret));
+	std::vector<uint8_t> key_der(256);
+	ret = wc_EccKeyToDer(&key, key_der.data(), static_cast<word32>(key_der.size()));
+	if (ret < 0) {
+		set_error(error, "wc_EccKeyToDer", ret);
+		return std::nullopt;
+	}
+	key_der.resize(static_cast<size_t>(ret));
 	Identity identity;
 	identity.cert_der = std::move(der);
 	identity.key_der = std::move(key_der);

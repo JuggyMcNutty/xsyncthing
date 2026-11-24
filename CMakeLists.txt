@@ -39,7 +39,10 @@ target_include_directories(xst_lz4 SYSTEM PUBLIC third_party/lz4/lib)
 
 # The portable core: no xsdk calls, builds on the host and the console alike.
 add_library(xst_core STATIC
+	src/api/api.cpp
+	src/api/http_server.cpp
 	src/core/base32.cpp
+	src/core/bcrypt.cpp
 	src/core/bep.cpp
 	src/core/bep_frame.cpp
 	src/core/config.cpp
@@ -65,6 +68,7 @@ add_library(xst_core STATIC
 	src/net/identity.cpp
 	src/net/local_discovery.cpp
 	src/net/relay.cpp
+	src/platform/log_ring.cpp
 	src/net/tcp.cpp
 	src/net/tls.cpp
 )

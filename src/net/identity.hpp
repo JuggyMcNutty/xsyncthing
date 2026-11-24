@@ -20,6 +20,9 @@ struct Identity {
 	// A new identity; nullopt if the RNG or certificate generation failed (error says why).
 	static std::optional<Identity> generate(std::string *error = nullptr, const std::string &common_name = "syncthing",
 		int days_valid = 20 * 365);
+	// An ECDSA P-256 identity, for the GUI's HTTPS (browsers don't take Ed25519; lib/tlsutil "compatible").
+	static std::optional<Identity> generate_ecdsa_p256(std::string *error = nullptr,
+		const std::string &common_name = "syncthing", int days_valid = 820);
 	// Loads cert.pem and key.pem as Syncthing writes them.
 	static std::optional<Identity> from_pem(const std::string &cert_pem, const std::string &key_pem,
 		std::string *error = nullptr);

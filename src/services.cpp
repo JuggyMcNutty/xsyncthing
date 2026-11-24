@@ -1,4 +1,5 @@
 // The optional services, registered on the App. Each phase adds its own here.
+#include "api/api.hpp"
 #include "app.hpp"
 #include "net/addresses.hpp"
 #include "net/global_discovery.hpp"
@@ -48,6 +49,13 @@ void register_services(App &app)
 		});
 		a.set_relays(relays.get());
 		a.add_service(std::move(relays));
+
+		// The REST API and Web GUI.
+		if (a.options().enable_api) {
+			auto api = std::make_unique<ApiServer>(a);
+			a.set_api(api.get());
+			a.add_service(std::move(api));
+		}
 	});
 }
 

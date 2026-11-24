@@ -42,6 +42,15 @@ void Events::log(const std::string &type, nlohmann::json data)
 	cv_.notify_all();
 }
 
+void Events::close()
+{
+	{
+		std::lock_guard lock(mu_);
+		closed_ = true;
+	}
+	cv_.notify_all();
+}
+
 int64_t Events::last_id()
 {
 	std::lock_guard lock(mu_);
@@ -66,10 +75,10 @@ std::vector<Events::Event> Events::since(int64_t since, const std::vector<std::s
 		return out;
 	};
 	auto out = collect();
-	if (!out.empty())
+	if (!out.empty() || closed_)
 		return out;
 	const auto deadline = std::chrono::steady_clock::now() + timeout;
-	while (out.empty() && cv_.wait_until(lock, deadline) != std::cv_status::timeout)
+	while (out.empty() && !closed_ && cv_.wait_until(lock, deadline) != std::cv_status::timeout)
 		out = collect();
 	if (out.empty())
 		out = collect();

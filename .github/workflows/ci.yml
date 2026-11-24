@@ -51,6 +51,19 @@ jobs:
           tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --relay "$RELAY" --relay-inbound --work /tmp/xst-interop-relay-in
       - name: Interop (FATX rules)
         run: tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --fatx --work /tmp/xst-interop-fatx
+      - name: REST API as the Web GUI uses it
+        run: tests/interop/api_check.py --xsyncthing build-host/xsyncthing
+      - name: Stock Web GUI in headless Chromium
+        run: |
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+          tests/interop/gui_check.py --xsyncthing build-host/xsyncthing --screenshot /tmp/xst-gui.png
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: webgui-screenshots
+          path: /tmp/xst-gui*.png
+          if-no-files-found: ignore
       - name: Logs
         if: failure()
         run: tail -n 100 /tmp/xst-interop*/a.log /tmp/xst-interop*/b.log
