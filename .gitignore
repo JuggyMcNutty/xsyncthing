@@ -1,0 +1,8 @@
+/build*/
+/.pi/
+*.xex
+*.elf
+*.o
+*.a
+compile_commands.json
+.cache/
