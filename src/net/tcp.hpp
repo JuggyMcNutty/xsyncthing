@@ -18,8 +18,9 @@ public:
 	void close() override;
 	int fd() const { return fd_; }
 
-	// Connects to host:port (a dotted IPv4 address or a name); nullptr and error on failure.
-	static std::unique_ptr<TcpStream> connect(const std::string &host, uint16_t port, std::string *error = nullptr);
+	// Connects to host:port (a dotted IPv4 address or a name) within timeout_ms; nullptr and error on failure.
+	static std::unique_ptr<TcpStream> connect(const std::string &host, uint16_t port, std::string *error = nullptr,
+		int timeout_ms = 10000);
 
 private:
 	int fd_ = -1;
@@ -30,7 +31,9 @@ class TcpListener {
 public:
 	~TcpListener();
 	static std::unique_ptr<TcpListener> listen(uint16_t port, std::string *error = nullptr);
-	std::unique_ptr<TcpStream> accept(std::string *peer = nullptr);
+	// Waits up to timeout_ms for a connection; nullptr if none came (or the listener is closed). Bounded, because
+	// on the console (Winsock under XAM) shutdown() doesn't wake a blocked accept().
+	std::unique_ptr<TcpStream> accept(std::string *peer = nullptr, int timeout_ms = 500);
 	uint16_t port() const { return port_; }
 	void close();
 	// Wakes a blocked accept() (which then returns nullptr).

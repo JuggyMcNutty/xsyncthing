@@ -8,7 +8,8 @@
   xbdm.py [--host IP] mkdir 'Hdd:\\xsyncthing'
   xbdm.py [--host IP] rm 'Hdd:\\xsyncthing\\old.log'
   xbdm.py [--host IP] launch 'Hdd:\\xsyncthing\\xsyncthing.xex'
-  xbdm.py [--host IP] run local.xex 'Hdd:\\xsyncthing' [--wait-log NAME --timeout S --done REGEX]
+  xbdm.py [--host IP] run local.xex 'Hdd:\\xsyncthing' [--wait-log NAME --timeout S --done REGEX] [--no-autoexit]
+  xbdm.py [--host IP] stop 'Hdd:\\xsyncthing'        # asks our running title to stop (stop.txt), waits for the dashboard
 
 The console's address defaults to $XBDM_HOST. Commands follow XBDM's text protocol: "200-" ok, "202-" multiline
 until ".", "203-" binary follows, "204-" send binary. Only the standard commands are used.
@@ -204,6 +205,8 @@ def main():
     ap.add_argument("args", nargs="*")
     ap.add_argument("--wait-log")
     ap.add_argument("--extra", action="append", help="another file to copy beside the .xex (run)")
+    ap.add_argument("--no-autoexit", action="store_true", help="leave the title running (run); stop it with 'stop'")
+    ap.add_argument("--no-wait", action="store_true", help="return once the title is running (run)")
     ap.add_argument("--timeout", type=float, default=300)
     ap.add_argument("--done", default=r"^.*checks: \d+ passed, \d+ failed|^.*exit: status")
     a = ap.parse_args()
@@ -216,14 +219,19 @@ def main():
         x = connect_when_up(a.host)
         now = x.running()
         x.close()
-        # A title holds its .xex and log open: go back to the dashboard first if one is running. Never reboot a
-        # console that is still booting.
+        # A title holds its .xex and log open. Ask one of ours to stop (stop.txt beside it); never reboot the console
+        # under a running title, which hung it once (results/2026-11-24-console/README.md).
         if not is_dashboard(now) and now and "\\flash\\" not in now.lower():
-            print(f"ending {now}")
+            title_dir = "Hdd:\\" + now.split("Partition1\\", 1)[-1].rsplit("\\", 1)[0] if "Partition1" in now else None
+            if not title_dir:
+                sys.exit(f"{now} is running; end it from the console first")
+            print(f"asking {now} to stop")
+            stamp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".stop.txt")
+            open(stamp, "w").write("1\n")
             x = connect_when_up(a.host)
-            x.reboot_to_dashboard()
+            x.put(stamp, f"{title_dir}\\stop.txt")
             x.close()
-            time.sleep(15)
+            os.remove(stamp)
         print(f"dashboard: {wait_for_dashboard(a.host)}")
         x = connect_when_up(a.host)
         try:
@@ -234,10 +242,15 @@ def main():
             except XbdmError:
                 pass
             # Tell the title to end by itself once done, so its log closes and can be fetched.
-            stamp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".autoexit.txt")
-            open(stamp, "w").write("1\n")
-            x.put(stamp, f"{remote_dir}\\autoexit.txt")
-            os.remove(stamp)
+            try:
+                x.rm(f"{remote_dir}\\autoexit.txt")
+            except XbdmError:
+                pass
+            if not a.no_autoexit:
+                stamp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".autoexit.txt")
+                open(stamp, "w").write("1\n")
+                x.put(stamp, f"{remote_dir}\\autoexit.txt")
+                os.remove(stamp)
             for extra in a.extra or []:
                 x.put(extra, f"{remote_dir}\\{os.path.basename(extra)}")
             n = x.put(local, f"{remote_dir}\\{name}")
@@ -271,6 +284,8 @@ def main():
                 x.close()
             except (OSError, ValueError):
                 pass
+        if a.no_wait:
+            return
         text, done = wait_for_log(a.host, f"{remote_dir}\\{log_name}", a.timeout, a.done)
         sys.stdout.write(text)
         if not done:
@@ -296,6 +311,15 @@ def main():
             data = x.get(a.args[0], a.args[1] if len(a.args) > 1 else None)
             if len(a.args) < 2:
                 sys.stdout.write(data.decode("utf-8", "replace"))
+        elif a.cmd == "stop":
+            # Asks one of our titles (in the folder given) to stop, then waits for the dashboard.
+            stamp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".stop.txt")
+            open(stamp, "w").write("1\n")
+            x.put(stamp, f"{a.args[0]}\\stop.txt")
+            os.remove(stamp)
+            x.close()
+            print(f"dashboard: {wait_for_dashboard(a.host, timeout=120)}")
+            return
         elif a.cmd == "launch":
             x.launch(a.args[0])
         else:

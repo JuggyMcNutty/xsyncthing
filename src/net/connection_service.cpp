@@ -304,13 +304,9 @@ void ConnectionService::listen_loop()
 	platform::log("connections: listening on tcp port " + std::to_string(listen_port_.load()));
 	while (!stopping_) {
 		std::string peer;
-		auto stream = listener->accept(&peer);
-		if (!stream) {
-			if (stopping_)
-				break;
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			continue;
-		}
+		auto stream = listener->accept(&peer, 500);
+		if (!stream)
+			continue; // timed out: check stopping_ again
 		std::lock_guard lock(threads_mu_);
 		conn_threads_.emplace_back([this, s = std::move(stream), peer]() mutable {
 			run_connection(std::move(s), peer, "tcp-server", TlsOptions::Role::server, std::nullopt);

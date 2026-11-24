@@ -2,6 +2,9 @@
 // a status screen at 720p: version, address, device ID, folders and connections. Back exits; so does Xbox Home,
 // which stops the daemon cleanly first. Logs checks the way xsdk's titles do, to xsyncthing.log beside the .xex.
 #include <atomic>
+#include <chrono>
+#include <thread>
+#include <unistd.h>
 #include <cinttypes>
 #include <cstdio>
 #include <format>
@@ -84,6 +87,13 @@ bool auto_exit_requested()
 	return stat("game:/autoexit.txt", &st) == 0;
 }
 
+// tools/xbdm.py stops a running title by copying stop.txt beside it, rather than rebooting the console under it.
+bool stop_requested()
+{
+	struct stat st;
+	return stat("game:/stop.txt", &st) == 0;
+}
+
 void run(uint32_t width, uint32_t height)
 {
 	std::string address = address_text();
@@ -99,8 +109,14 @@ void run(uint32_t width, uint32_t height)
 		if (XamInputGetState(0, 0, &input) == ERROR_SUCCESS && input.gamepad.buttons & INPUT_GAMEPAD_BACK)
 			return;
 		// The address can take a few seconds to come from DHCP: look again about once a second.
-		if (frame % 60 == 0)
+		if (frame % 60 == 0) {
 			address = address_text();
+			if (stop_requested()) {
+				xsdk_log_write("xsyncthing: stop.txt found, stopping");
+				::remove("game:/stop.txt");
+				return;
+			}
+		}
 
 		uint32_t target;
 		const NTSTATUS status = xsdk_present_begin(&target, kBeginTimeoutMs);
@@ -176,7 +192,24 @@ int main()
 		xsdk_text_close();
 	}
 	g_app = nullptr;
+	// A watchdog: if stopping the daemon hangs, end the title anyway rather than leave the console stuck in it.
+	std::atomic<bool> stopped{ false };
+	std::thread watchdog([&] {
+		for (int i = 0; i < 150 && !stopped; i++)
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		if (!stopped) {
+			xsdk_log_write("xsyncthing: stopping took over 15 s; ending the title");
+			xsdk_log_write("checks: %u passed, %u failed", (unsigned)passed, (unsigned)failed + 1);
+			_exit(2);
+		}
+	});
+	const auto stop_start = std::chrono::steady_clock::now();
 	app.stop();
+	stopped = true;
+	watchdog.join();
+	xsdk_log_write("xsyncthing: the daemon stopped in %lld ms",
+		(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - stop_start)
+			.count());
 	check("xsyncthing: the daemon stops", true);
 	xsdk_present_close();
 	xsdk_gpu_close();
