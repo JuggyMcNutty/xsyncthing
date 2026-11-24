@@ -228,3 +228,38 @@ TEST(block_sizes)
 	CHECK_EQ(block_size_for(250LL << 20), 256 << 10);
 	CHECK_EQ(block_size_for(1LL << 40), 16 << 20);
 }
+
+TEST(sync_unstorable_name_is_never_deleted_remotely)
+{
+	// Regression (console run 2026-11-24): a name FATX can't hold was recorded as unsupported, then the next scan
+	// saw it missing from disk and announced a deletion, which deleted it on the PC.
+	Side a = make_side("a5", 0x1111111111111111);
+	Side b = make_side("b5", 0x2222222222222222);
+	fs::VolumeRules fatx;
+	fatx.type = "fatx";
+	fatx.max_name_bytes = 42;
+	fatx.keeps_permissions = false;
+	b.fs = fs::open_posix_with_rules((b.dir / "data").string(), fatx);
+	const std::string long_name = "this-file-name-is-much-too-long-for-the-xbox-fatx-volume.txt";
+	write(a, long_name, "keep me");
+	write(a, "short.txt", "fine");
+	scan_side(a);
+	exchange(a, b);
+	const auto r = pull_side(b, a);
+	CHECK_EQ(r.errors.size(), 1u);
+	CHECK(r.errors.count(long_name));
+	CHECK_EQ(read(b, "short.txt"), "fine");
+	scan_side(b); // must not turn the unstored name into a deletion
+	const auto mine = b.db->get("f", Db::local_device(), long_name);
+	CHECK(mine && !mine->deleted && (mine->local_flags & kFlagUnsupported));
+	exchange(b, a);
+	const auto g = a.db->global("f", long_name);
+	CHECK(g && !g->deleted);
+	// And nothing is left for B to pull over and over.
+	int needed = 0;
+	b.db->each_needed("f", [&](const bep::FileInfo &) {
+		needed++;
+		return true;
+	});
+	CHECK_EQ(needed, 0);
+}

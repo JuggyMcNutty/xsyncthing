@@ -68,6 +68,8 @@ bool Config::load(const std::string &path, const DeviceId &my_id, const std::str
 	if (in) {
 		std::stringstream ss;
 		ss << in.rdbuf();
+		// Close before writing below: the console refuses to remove or replace a file that's still open.
+		in.close();
 		try {
 			cfg_ = json::parse(ss.str());
 		} catch (const std::exception &e) {

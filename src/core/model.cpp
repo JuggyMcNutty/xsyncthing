@@ -357,8 +357,8 @@ void Model::folder_loop(const std::string &id)
 				}
 				if (!r.errors.empty())
 					events_.log("FolderErrors", { { "folder", id }, { "errors", folder_errors(id) } });
-				if (r.pulled > 0) {
-					events_.log("LocalIndexUpdated", { { "folder", id }, { "items", r.pulled },
+				if (r.recorded > 0) {
+					events_.log("LocalIndexUpdated", { { "folder", id }, { "items", r.recorded },
 														 { "filenames", json::array() },
 														 { "sequence", db_.max_sequence(id, Db::local_device()) },
 														 { "version", db_.max_sequence(id, Db::local_device()) } });

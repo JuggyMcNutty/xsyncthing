@@ -37,6 +37,7 @@ struct PullOptions {
 
 struct PullResult {
 	int64_t pulled = 0;
+	int64_t recorded = 0; // local index entries written (pulled, or recorded as unsupported): announce if > 0
 	int64_t bytes_fetched = 0;
 	int64_t bytes_reused = 0;
 	int64_t conflicts = 0;

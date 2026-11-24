@@ -120,7 +120,7 @@ xsyncthing/
 - [x] Docker interop test: a send-receive folder between the host build and stock Syncthing, both directions.
 
 ### Phase 3: Console platform layer
-- [ ] fs backends for FATX, FAT32 and exFAT, with the name and size checks; an SQLite VFS; thread placement;
+- [x] fs backends for FATX, FAT32 and exFAT, with the name and size checks; an SQLite VFS; thread placement;
   `xsdk_on_terminate` to close the DB cleanly.
 - [ ] A LAN sync test on the console against a PC (static address first).
 

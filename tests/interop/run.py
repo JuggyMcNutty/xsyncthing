@@ -195,9 +195,22 @@ def main():
         check("concurrent edits: newer wins on both sides, a conflict copy is kept",
               wait_for("the conflict to settle", conflict_resolved, 120))
 
-        # 5. Completion as stock Syncthing sees it.
-        check("A reports B 100% complete", wait_for("completion", lambda: http(
-            key, "GET", f"/rest/db/completion?folder=interop&device={bid}")["completion"] == 100, 60))
+        # 5. With FATX rules: a name B can't store stays on A (B reports it, never deletes it).
+        if a.fatx:
+            long_name = "this-file-name-is-much-too-long-for-the-xbox-fatx-volume.txt"
+            open(A(long_name), "w").write("must survive\n")
+            time.sleep(20)  # several scan/pull rounds on both sides
+            check("a name FATX can't hold is left alone on A (not deleted)", os.path.exists(A(long_name)))
+            check("... and isn't written on B", not os.path.exists(B(long_name)))
+
+        # 6. Completion as stock Syncthing sees it.
+        ok = wait_for("completion", lambda: http(
+            key, "GET", f"/rest/db/completion?folder=interop&device={bid}")["completion"] == 100, 60)
+        if not ok:
+            print("  A's completion for B:", http(key, "GET", f"/rest/db/completion?folder=interop&device={bid}"))
+            print("  A's remote need for B:", json.dumps(http(
+                key, "GET", f"/rest/db/remoteneed?folder=interop&device={bid}"))[:800])
+        check("A reports B 100% complete", ok)
     finally:
         for p in procs:
             try:

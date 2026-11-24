@@ -228,7 +228,9 @@ ScanResult scan(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 			return true;
 		if (!subdir.empty() && !(f.name == subdir || f.name.starts_with(subdir + "/")))
 			return true;
-		if (f.local_flags & kFlagIgnored)
+		// Entries we never stored (unsupported: a name the volume can't hold, a symlink) or ignore aren't on disk by
+		// design; announcing them as deleted would delete them everywhere else.
+		if (f.local_flags & (kFlagIgnored | kFlagUnsupported))
 			return true;
 		gone.push_back(f);
 		return true;

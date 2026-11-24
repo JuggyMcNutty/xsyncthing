@@ -111,6 +111,14 @@ PullResult pull(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 		f.sequence = db.next_local_sequence(options.folder_id);
 		f.local_flags = 0;
 		db.update(options.folder_id, local, { f });
+		result.recorded++;
+	};
+	auto record_unsupported = [&](const bep::FileInfo &g) {
+		bep::FileInfo u = g;
+		u.local_flags = kFlagUnsupported;
+		u.sequence = db.next_local_sequence(options.folder_id);
+		db.update(options.folder_id, local, { u });
+		result.recorded++;
 	};
 	auto fail = [&](const bep::FileInfo &f, const std::string &why) {
 		result.errors[f.name] = why;
@@ -158,14 +166,10 @@ PullResult pull(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 		if (const auto why = fs::unstorable_reason(g.name, g.size, fs.rules()); !why.empty()) {
 			// Record it as unsupported at the global version (announced as invalid, as upstream does for kinds it
 			// can't store), so it isn't needed forever; it stays listed as a folder error.
-			if (!g.deleted) {
-				bep::FileInfo u = g;
-				u.local_flags = kFlagUnsupported;
-				u.sequence = db.next_local_sequence(options.folder_id);
-				db.update(options.folder_id, local, { u });
-			} else {
+			if (!g.deleted)
+				record_unsupported(g);
+			else
 				record(g);
-			}
 			fail(g, why);
 			continue;
 		}
@@ -223,10 +227,7 @@ PullResult pull(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 
 		if (g.type != bep::FileInfoType::file) {
 			// Symlinks: not supported on the console's volumes. Record as unsupported so we don't need it forever.
-			bep::FileInfo u = g;
-			u.local_flags = kFlagUnsupported;
-			u.sequence = db.next_local_sequence(options.folder_id);
-			db.update(options.folder_id, local, { u });
+			record_unsupported(g);
 			fail(g, "symlinks are not supported");
 			continue;
 		}
