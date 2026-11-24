@@ -25,6 +25,30 @@ jobs:
           CXX: g++-14
         run: scripts/build-host.sh
 
+  interop:
+    name: interop with stock Syncthing
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14
+      - name: Build
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: scripts/build-host.sh
+      - name: Stock Syncthing
+        run: echo "ST=$(tests/interop/get-syncthing.sh)" >> "$GITHUB_ENV"
+      - name: Interop
+        run: tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing
+      - name: Interop (FATX rules)
+        run: tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --fatx --work /tmp/xst-interop-fatx
+      - name: Logs
+        if: failure()
+        run: tail -n 100 /tmp/xst-interop*/a.log /tmp/xst-interop*/b.log
+
   xsdk:
     name: console build (.xex)
     runs-on: ubuntu-24.04
@@ -62,7 +86,7 @@ jobs:
   release:
     name: release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [host, xsdk]
+    needs: [host, interop, xsdk]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

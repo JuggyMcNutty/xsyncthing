@@ -116,7 +116,7 @@ xsyncthing/
 
 ### Phase 2: BEP core (host-first)
 - [x] Device ID, nanopb messages, framing, LZ4, Hello/ClusterConfig/Index/Request/Response/Ping/Close.
-- [ ] SQLite schema and index DB; the scanner with ignores; the model and version vectors; the puller with conflicts.
+- [x] SQLite schema and index DB; the scanner with ignores; the model and version vectors; the puller with conflicts.
 - [ ] Docker interop test: a send-receive folder between the host build and stock Syncthing, both directions.
 
 ### Phase 3: Console platform layer
