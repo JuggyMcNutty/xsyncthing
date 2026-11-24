@@ -69,6 +69,8 @@ Model::~Model() { stop(); }
 void Model::start()
 {
 	config_.on_change([this] {
+		for (const auto &n : config_.take_notes())
+			add_system_error(n);
 		events_.log("ConfigSaved", config_.get());
 		reconcile_folders();
 	});
@@ -799,6 +801,34 @@ void Model::handle_request(const DeviceId &device, const bep::Request &req)
 }
 
 // --- status for the API and UI ---------------------------------------------------------------------------------------
+
+json Model::system_errors() const
+{
+	std::lock_guard lock(mu_);
+	if (system_errors_.empty())
+		return nullptr;
+	json out = json::array();
+	for (const auto &[when, msg] : system_errors_)
+		out.push_back({ { "when", when }, { "message", msg }, { "level", "WRN" } });
+	return out;
+}
+
+void Model::add_system_error(const std::string &message)
+{
+	{
+		std::lock_guard lock(mu_);
+		system_errors_.emplace_back(rfc3339_now(), message);
+		if (system_errors_.size() > 50)
+			system_errors_.erase(system_errors_.begin());
+	}
+	events_.log("Failure", message);
+}
+
+void Model::clear_system_errors()
+{
+	std::lock_guard lock(mu_);
+	system_errors_.clear();
+}
 
 Model::FolderState Model::folder_state(const std::string &folder) const
 {

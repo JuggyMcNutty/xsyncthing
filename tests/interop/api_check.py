@@ -126,6 +126,37 @@ def main():
         check("DELETE /rest/config/devices/<id> (also unshares)", st == 200 and
               all(d["deviceID"] != peer for f in rest("/rest/config")[1]["folders"] for d in f["devices"]))
 
+        # 4b. Unsupported features answer safely, in upstream's shape, and are turned off in the config.
+        st, up = rest("/rest/system/upgrade")
+        check("GET /rest/system/upgrade reports no newer version", st == 200 and up["newer"] is False)
+        st, _ = rest("/rest/system/upgrade", "POST")
+        check("POST /rest/system/upgrade is a safe no-op (200)", st == 200)
+        try:
+            rest("/rest/folder/versions?folder=abcd-1234")
+            check("GET /rest/folder/versions answers 'no versioner' (500, as upstream)", False)
+        except urllib.error.HTTPError as e:
+            check("GET /rest/folder/versions answers 'no versioner' (500, as upstream)", e.code == 500)
+        st, rep = rest("/rest/svc/report")
+        check("GET /rest/svc/report shows a report (it is never sent)", st == 200 and "version" in rep)
+        st, cfg3 = rest("/rest/config")
+        for f_ in cfg3["folders"]:
+            if f_["id"] == "abcd-1234":
+                f_["versioning"]["type"] = "simple"
+        rest("/rest/config", "PUT", cfg3)
+        time.sleep(1.5)
+        st, cfg4 = rest("/rest/config")
+        vt = [f_ for f_ in cfg4["folders"] if f_["id"] == "abcd-1234"][0]["versioning"]["type"]
+        st, errs = rest("/rest/system/error")
+        check("asking for versioning turns it off and says why in /rest/system/error",
+              vt == "" and errs["errors"] and "versioning" in errs["errors"][0]["message"])
+        rest("/rest/system/error/clear", "POST")
+        check("POST /rest/system/error/clear clears it", rest("/rest/system/error")[1]["errors"] is None)
+        try:
+            rest("/rest/debug/peerCompletion")
+            check("/rest/debug/* is not available (404)", False)
+        except urllib.error.HTTPError as e:
+            check("/rest/debug/* is not available (404)", e.code == 404)
+
         # 5. Events: the poll returns what happened, and a long-poll waits for the next one.
         st, evs = rest("/rest/events?since=0&timeout=1")
         check("GET /rest/events returns events", st == 200 and isinstance(evs, list) and len(evs) > 0)

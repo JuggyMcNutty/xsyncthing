@@ -708,11 +708,14 @@ Response ApiServer::route(const Request &req)
 	}
 	if (p == "/rest/system/error") {
 		if (get)
-			return json_response({ { "errors", nullptr } });
+			return json_response({ { "errors", model.system_errors() } });
+		model.add_system_error(req.body);
 		return no_content();
 	}
-	if (p == "/rest/system/error/clear")
+	if (p == "/rest/system/error/clear") {
+		model.clear_system_errors();
 		return no_content();
+	}
 	if (p == "/rest/system/log" || p == "/rest/system/log.txt") {
 		const auto lines = platform::recent_log();
 		if (p.ends_with(".txt")) {
@@ -793,11 +796,12 @@ Response ApiServer::route(const Request &req)
 		return no_content();
 	}
 	if (p == "/rest/system/upgrade") {
-		// No self-upgrade on the console: releases are new .xex files (docs/COMPAT.md).
+		// No self-upgrade on the console: releases are new .xex files (docs/COMPAT.md). Report "up to date", which
+		// is what the GUI shows when there's nothing newer, and never contact the release server.
 		if (get)
 			return json_response({ { "latest", std::string(client_version()) }, { "majorNewer", false }, { "newer", false },
 				{ "running", std::string(client_version()) } });
-		return error_response(501, "upgrade unsupported");
+		return json_response({ { "ok", "up to date" } });
 	}
 
 	// --- /rest/svc ------------------------------------------------------------------------------------------------
@@ -927,7 +931,7 @@ Response ApiServer::route(const Request &req)
 			{ "perpage", 65536 } });
 	}
 	if (p == "/rest/folder/versions")
-		return error_response(500, "folder has no versioner");
+		return error_response(500, "folder has no versioner"); // versioning isn't supported (docs/COMPAT.md)
 	if (p == "/rest/stats/device")
 		return json_response(model.device_stats());
 	if (p == "/rest/stats/folder")

@@ -132,7 +132,7 @@ xsyncthing/
 ### Phase 5: REST API and Web GUI
 - [x] HTTP server, API key, CSRF, `/rest/events` long-polling.
 - [x] The endpoint subset the GUI uses, one endpoint at a time.
-- [ ] Optional HTTPS with an ECDSA-P256 cert.
+- [x] Optional HTTPS with an ECDSA-P256 cert.
 - [ ] Unsupported features (`system/upgrade`, `svc/report`, browse on symlinks, …) return safe stubs.
 - [ ] GUI listens on the LAN; the console UI shows its address and API key/password.
 

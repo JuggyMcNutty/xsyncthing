@@ -41,12 +41,17 @@ public:
 	DeviceId my_id() const { return my_id_; }
 
 	void on_change(std::function<void()> fn);
+	// What the last change had turned off as unsupported (and clears it).
+	std::vector<std::string> take_notes();
 
 	static json default_config();
 	static json default_folder();
 	static json default_device();
 	// Fills every key the GUI expects in a folder/device object from the defaults.
 	static void fill_folder(json &f);
+	// Turns off what xsyncthing doesn't support (versioning, untrusted devices, encrypted folders, IPv6-only
+	// addresses), and lists what it changed so the caller can report it.
+	static std::vector<std::string> enforce_supported(json &cfg);
 	static void fill_device(json &d);
 
 private:
@@ -57,6 +62,7 @@ private:
 	std::string path_;
 	DeviceId my_id_;
 	std::vector<std::function<void()>> listeners_;
+	std::vector<std::string> last_notes_;
 };
 
 } // namespace xst

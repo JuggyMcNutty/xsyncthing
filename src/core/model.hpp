@@ -110,6 +110,11 @@ public:
 	void override_folder(const std::string &folder);
 	void revert_folder(const std::string &folder);
 
+	// The GUI's notification area (/rest/system/error).
+	json system_errors() const;
+	void add_system_error(const std::string &message);
+	void clear_system_errors();
+
 	Db &db() { return db_; }
 	Config &config() { return config_; }
 	Events &events() { return events_; }
@@ -161,6 +166,7 @@ private:
 	std::atomic<bool> stopping_{ false };
 	std::atomic<int64_t> total_in_{ 0 }, total_out_{ 0 };
 	std::mutex db_mu_; // serializes database writes from folder threads and the network
+	std::vector<std::pair<std::string, std::string>> system_errors_; // when, message
 };
 
 } // namespace xst

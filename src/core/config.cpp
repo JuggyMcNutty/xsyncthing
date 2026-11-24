@@ -3,6 +3,7 @@
 #include <fstream>
 #include <random>
 #include <sstream>
+#include <utility>
 
 namespace xst {
 
@@ -37,6 +38,34 @@ void merge_defaults(json &target, const json &defaults)
 } // namespace
 
 json Config::default_config() { return json::parse(kDefaults); }
+
+std::vector<std::string> Config::enforce_supported(json &cfg)
+{
+	std::vector<std::string> notes;
+	for (auto &f : cfg["folders"]) {
+		const std::string id = f.value("id", "");
+		if (f.contains("versioning") && !f["versioning"].value("type", "").empty()) {
+			notes.push_back("folder " + id + ": file versioning is not supported on the console; turned off");
+			f["versioning"]["type"] = "";
+		}
+		if (f.value("type", "") == "receiveencrypted") {
+			notes.push_back("folder " + id + ": receive-encrypted folders are not supported; paused");
+			f["paused"] = true;
+		}
+		for (auto &d : f["devices"])
+			if (!d.value("encryptionPassword", "").empty()) {
+				notes.push_back("folder " + id + ": sharing with an untrusted (encrypted) device is not supported");
+				d["encryptionPassword"] = "";
+			}
+	}
+	for (auto &d : cfg["devices"])
+		if (d.value("untrusted", false)) {
+			notes.push_back("device " + d.value("name", d.value("deviceID", "")) + ": untrusted devices are not supported; paused");
+			d["untrusted"] = false;
+			d["paused"] = true;
+		}
+	return notes;
+}
 json Config::default_folder() { return default_config()["defaults"]["folder"]; }
 json Config::default_device() { return default_config()["defaults"]["device"]; }
 
@@ -98,6 +127,7 @@ bool Config::load(const std::string &path, const DeviceId &my_id, const std::str
 		fill_folder(f);
 	for (auto &d : cfg_["devices"])
 		fill_device(d);
+	enforce_supported(cfg_);
 	return write_locked(error);
 }
 
@@ -146,6 +176,7 @@ void Config::replace(json cfg)
 			fill_folder(f);
 		for (auto &d : cfg["devices"])
 			fill_device(d);
+		last_notes_ = enforce_supported(cfg);
 		cfg_ = std::move(cfg);
 	}
 	save();
@@ -161,6 +192,7 @@ void Config::modify(const std::function<void(json &)> &fn)
 			fill_folder(f);
 		for (auto &d : cfg_["devices"])
 			fill_device(d);
+		last_notes_ = enforce_supported(cfg_);
 	}
 	save();
 	notify();
@@ -223,6 +255,12 @@ bool Config::folder_shared_with(const std::string &folder, const DeviceId &devic
 		if (DeviceId::parse(d.value("deviceID", "")) == device)
 			return true;
 	return false;
+}
+
+std::vector<std::string> Config::take_notes()
+{
+	std::lock_guard lock(mu_);
+	return std::exchange(last_notes_, {});
 }
 
 void Config::on_change(std::function<void()> fn)
