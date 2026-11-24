@@ -108,13 +108,16 @@ jobs:
         run: scripts/bootstrap.sh
       - name: Build xsyncthing.xex
         run: scripts/build-xex.sh
+      - name: Package
+        run: scripts/package.sh "${GITHUB_REF_NAME}"
       - uses: actions/upload-artifact@v7
         with:
           name: xsyncthing-xex
           path: |
+            dist/xsyncthing-*.zip
             build-xsdk/xsyncthing.xex
             build-xsdk/xst-console-test.xex
-            assets/cacert.pem
+            build-xsdk/xst-soak.xex
           if-no-files-found: error
 
   release:
@@ -125,10 +128,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: xsyncthing-xex
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" xsyncthing.xex xst-console-test.xex assets/cacert.pem --repo "$GITHUB_REPOSITORY" --generate-notes --prerelease
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/xsyncthing-*.zip build-xsdk/xsyncthing.xex
+          --repo "$GITHUB_REPOSITORY" --title "xsyncthing $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --prerelease

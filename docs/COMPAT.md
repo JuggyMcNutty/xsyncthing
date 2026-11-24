@@ -51,3 +51,17 @@ The stock Web GUI is served unmodified. The endpoints it uses answer with the sa
 | `/rest/debug/*`, `/metrics` | not available (404) |
 | `/rest/db/need` | everything needed is listed under `rest`; `progress` and `queued` stay empty |
 | LDAP authentication | not supported; user and password are stored as bcrypt, as upstream |
+
+## Performance
+
+Measured with `tools/soak.cpp`, 1 KiB files, about 100 to a directory:
+
+| Where | Scan | Pull | Memory |
+|---|---|---|---|
+| Host (Linux, NVMe), 100,000 files | 3.5 s (29k files/s) | 9 s (11k files/s) | 24 MiB |
+| Console hard disk (FATX), 2,000 files | 1,000 files/s | 22 files/s (fsync on); 250 files/s (fsync off) | 3 MiB |
+
+On the console, a pulled file's cost is dominated by `fsync`: about 37 ms per file on the stock hard disk. Like
+upstream, xsyncthing syncs each file to disk before renaming it into place, so a power cut can't leave a half-written
+file under its real name. Setting a folder's `disableFsync` (Web GUI: folder > Advanced) trades that safety for about
+10× more files a second.
