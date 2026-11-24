@@ -104,7 +104,7 @@ xsyncthing/
 - [x] `git init`; add the skeleton above, the GPL-3.0 LICENSE and a README (unofficial, scope, status).
 - [x] `gh repo create JuggyMcNutty/xsyncthing --public --source . --push`; set the description and topics
   (xbox360, syncthing, homebrew, xsdk).
-- [ ] Add xsdk as a submodule. Write a `scripts/bootstrap.sh` that runs xsdk's `tools/toolchain/build.sh` to install
+- [x] Add xsdk as a submodule. Write a `scripts/bootstrap.sh` that runs xsdk's `tools/toolchain/build.sh` to install
   `~/xsdk-gcc`.
 - [ ] Hello-world `.xex` built from `samples/template`; it runs in Xenia and on the console.
 - [ ] CI: a host job, plus an xsdk job that caches the toolchain and uploads the `.xex`.

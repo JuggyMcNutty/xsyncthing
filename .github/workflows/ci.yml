@@ -15,9 +15,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake g++-14
       - name: Build and test
+        env:
+          CC: gcc-14
+          CXX: g++-14
         run: scripts/build-host.sh
 
   xsdk:

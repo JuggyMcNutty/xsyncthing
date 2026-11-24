@@ -30,3 +30,7 @@ add_library(xst_wolfcrypt_test OBJECT "${XST_WOLFSSL_DIR}/wolfcrypt/test/test.c"
 target_link_libraries(xst_wolfcrypt_test PUBLIC xst_wolfssl)
 target_compile_definitions(xst_wolfcrypt_test PRIVATE NO_MAIN_DRIVER)
 target_compile_options(xst_wolfcrypt_test PRIVATE -w)
+if(XSDK)
+	# xsdk's GCC defines __unix__, which turns on the RNG lock tests that need pipe(); the console has none.
+	target_compile_options(xst_wolfcrypt_test PRIVATE -U__unix__ -U__unix)
+endif()

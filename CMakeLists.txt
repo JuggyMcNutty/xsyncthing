@@ -44,6 +44,12 @@ if(XSDK)
 	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core)
 	target_compile_options(xsyncthing PRIVATE ${XST_WARNINGS})
 	xsdk_add_xex(xsyncthing TITLE_ID ${XST_TITLE_ID} NAME "xsyncthing" VERSION ${PROJECT_VERSION}.0)
+
+	# The on-console checks (tests/console): wolfCrypt's suite, identity, and a handshake with a peer.
+	add_executable(xst-console-test tests/console/console_test.cpp)
+	target_link_libraries(xst-console-test PRIVATE xst_wolfcrypt_test xst_platform xst_core)
+	target_compile_options(xst-console-test PRIVATE ${XST_WARNINGS})
+	xsdk_add_xex(xst-console-test TITLE_ID 0x58535954 NAME "xsyncthing tests" VERSION ${PROJECT_VERSION}.0)
 else()
 	add_library(xst_platform STATIC src/platform/posix/platform.cpp)
 	target_link_libraries(xst_platform PUBLIC xst_core)
