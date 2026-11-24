@@ -31,6 +31,8 @@ struct PullOptions {
 	const std::atomic<bool> *cancel = nullptr;
 	// Wall clock for conflict names (tests pin it).
 	std::function<std::string()> conflict_timestamp;
+	// Each file pulled into place (for RemoteChangeDetected).
+	std::function<void(const bep::FileInfo &)> on_pulled;
 	// Called as each file finishes (name, error or "").
 	std::function<void(const std::string &, const std::string &)> on_item;
 };

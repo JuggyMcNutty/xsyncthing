@@ -127,6 +127,8 @@ PullResult pull(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 	};
 	auto done = [&](const bep::FileInfo &f) {
 		result.pulled++;
+		if (options.on_pulled)
+			options.on_pulled(f);
 		if (options.on_item)
 			options.on_item(f.name, "");
 	};

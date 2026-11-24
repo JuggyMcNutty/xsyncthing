@@ -24,6 +24,8 @@ struct ScanOptions {
 	const std::atomic<bool> *cancel = nullptr;
 	// Progress: bytes hashed so far.
 	std::function<void(int64_t)> progress;
+	// Each batch of changes recorded (for LocalChangeDetected).
+	std::function<void(const std::vector<bep::FileInfo> &)> on_changes;
 };
 
 struct ScanResult {

@@ -111,6 +111,8 @@ ScanResult scan(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 			f.sequence = db.next_local_sequence(options.folder_id);
 		db.update(options.folder_id, local, batch);
 		db.commit();
+		if (options.on_changes)
+			options.on_changes(batch);
 		batch.clear();
 	};
 	auto record = [&](bep::FileInfo f, const std::optional<bep::FileInfo> &old) {

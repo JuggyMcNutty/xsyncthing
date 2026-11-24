@@ -57,10 +57,14 @@ public:
 	std::vector<DeviceId> availability(const std::string &folder, const std::string &name);
 
 	void each_local(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn);
+	void each_global(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn);
 	// Local files with sequence > after, in sequence order: what to send a peer in an index update.
 	void local_since(const std::string &folder, int64_t after, const std::function<bool(const bep::FileInfo &)> &fn);
 	// Names where the global version is newer than ours (or we lack it), with the global file: what to pull.
 	void each_needed(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn);
+	// Global files the device lacks or has older (deletions only where it still has the file).
+	void each_remote_needed(const std::string &folder, const DeviceId &device,
+		const std::function<bool(const bep::FileInfo &)> &fn);
 	// What a remote device needs from the global set (for completion figures).
 	struct Counts {
 		int64_t files = 0, directories = 0, deleted = 0, bytes = 0;

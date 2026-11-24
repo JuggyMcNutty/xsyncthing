@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <random>
 
+#include "core/base32.hpp"
 #include "core/puller.hpp"
 #include "core/scanner.hpp"
 #include "core/sha256.hpp"
@@ -67,7 +68,10 @@ Model::~Model() { stop(); }
 
 void Model::start()
 {
-	config_.on_change([this] { reconcile_folders(); });
+	config_.on_change([this] {
+		events_.log("ConfigSaved", config_.get());
+		reconcile_folders();
+	});
 	reconcile_folders();
 	events_.log("Starting", { { "home", "" } });
 	events_.log("StartupComplete", json::object());
@@ -286,6 +290,7 @@ void Model::folder_loop(const std::string &id)
 			o.mtime_window_ns = std::max<int64_t>(rules.mtime_window_ns,
 				static_cast<int64_t>(f->cfg.value("modTimeWindowS", 0)) * 1000000000LL);
 			o.cancel = &f->cancel;
+			o.on_changes = [&](const std::vector<bep::FileInfo> &changed) { emit_disk_changes(id, changed, true); };
 			o.progress = [&](int64_t hashed) {
 				std::lock_guard lock(mu_);
 				f->state.scan_hashed = hashed;
@@ -332,6 +337,7 @@ void Model::folder_loop(const std::string &id)
 				o.max_conflicts = f->cfg.value("maxConflicts", 10);
 				o.max_name_bytes = rules.max_name_bytes;
 				o.cancel = &f->cancel;
+				o.on_pulled = [&](const bep::FileInfo &f) { emit_disk_changes(id, { f }, false); };
 				o.on_item = [&](const std::string &name, const std::string &err) {
 					events_.log("ItemFinished", { { "folder", id }, { "item", name }, { "type", "file" },
 													 { "action", "update" },
@@ -373,6 +379,17 @@ void Model::folder_loop(const std::string &id)
 		}
 		set_state(id, "idle");
 		events_.log("FolderSummary", { { "folder", id }, { "summary", folder_status(id) } });
+		// FolderCompletion for each device the folder is shared with, as lib/model/folder_summary.go does after a
+		// summary: the GUI shows remote devices' progress from these.
+		for (const auto &fd : f->cfg.value("devices", json::array())) {
+			const auto did = DeviceId::parse(fd.value("deviceID", ""));
+			if (!did || *did == config_.my_id())
+				continue;
+			json ev = completion(id, *did);
+			ev["folder"] = id;
+			ev["device"] = did->to_string();
+			events_.log("FolderCompletion", ev);
+		}
 	}
 }
 
@@ -1006,76 +1023,176 @@ json Model::folder_stats() const
 	return out;
 }
 
+json Model::file_json(const bep::FileInfo &f)
+{
+	static const char *types[] = { "FILE_INFO_TYPE_FILE", "FILE_INFO_TYPE_DIRECTORY", "FILE_INFO_TYPE_SYMLINK_FILE",
+		"FILE_INFO_TYPE_SYMLINK_DIRECTORY", "FILE_INFO_TYPE_SYMLINK" };
+	const int t = static_cast<int>(f.type);
+	json version = json::array();
+	for (const auto &c : f.version.counters) {
+		uint8_t b[8];
+		for (int i = 0; i < 8; i++)
+			b[i] = static_cast<uint8_t>(c.id >> (56 - 8 * i));
+		version.push_back(base32::encode(b).substr(0, 7) + ":" + std::to_string(c.value));
+	}
+	uint8_t mb[8];
+	for (int i = 0; i < 8; i++)
+		mb[i] = static_cast<uint8_t>(f.modified_by >> (56 - 8 * i));
+	auto b64 = [](const bep::Bytes &b) -> json {
+		if (b.empty())
+			return nullptr;
+		static const char *t = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		std::string out;
+		for (size_t i = 0; i < b.size(); i += 3) {
+			const uint32_t v = b[i] << 16 | (i + 1 < b.size() ? b[i + 1] << 8 : 0) | (i + 2 < b.size() ? b[i + 2] : 0);
+			out.push_back(t[v >> 18 & 63]);
+			out.push_back(t[v >> 12 & 63]);
+			out.push_back(i + 1 < b.size() ? t[v >> 6 & 63] : '=');
+			out.push_back(i + 2 < b.size() ? t[v & 63] : '=');
+		}
+		return out;
+	};
+	json j = { { "name", f.name }, { "type", t >= 0 && t < 5 ? types[t] : "FILE_INFO_TYPE_FILE" }, { "size", f.size },
+		{ "deleted", f.deleted }, { "invalid", is_invalid(f) }, { "ignored", (f.local_flags & kFlagIgnored) != 0 },
+		{ "mustRescan", (f.local_flags & kFlagMustRescan) != 0 }, { "noPermissions", f.no_permissions },
+		{ "modified", rfc3339(f.modified_s, f.modified_ns) },
+		{ "modifiedBy", f.modified_by ? base32::encode(mb).substr(0, 7) : "" }, { "sequence", f.sequence },
+		{ "version", version }, { "localFlags", f.local_flags }, { "numBlocks", f.blocks.size() },
+		{ "platform", { { "Unix", nullptr }, { "Windows", nullptr }, { "Linux", nullptr }, { "Darwin", nullptr },
+						  { "FreeBSD", nullptr }, { "NetBSD", nullptr } } },
+		{ "blocksHash", b64(f.blocks_hash) }, { "previousBlocksHash", b64(f.previous_blocks_hash) } };
+	if (!f.no_permissions) {
+		char perm[16];
+		std::snprintf(perm, sizeof perm, "0%o", f.permissions);
+		j["permissions"] = perm;
+	}
+	return j;
+}
+
 json Model::need(const std::string &folder, int page, int per_page)
 {
+	// Upstream splits these by puller progress; everything here is "rest" until its pull starts.
 	json progress = json::array(), queued = json::array(), rest = json::array();
 	int i = 0;
 	const int skip = (page - 1) * per_page;
 	db_.each_needed(folder, [&](const bep::FileInfo &f) {
 		if (i >= skip && i < skip + per_page)
-			rest.push_back({ { "name", f.name }, { "size", f.size }, { "type", f.type == bep::FileInfoType::directory ? "FILE_INFO_TYPE_DIRECTORY" : "FILE_INFO_TYPE_FILE" },
-				{ "modified", rfc3339(f.modified_s, f.modified_ns) }, { "deleted", f.deleted } });
+			rest.push_back(file_json(f));
 		i++;
 		return true;
 	});
-	return { { "progress", progress }, { "queued", queued }, { "rest", rest }, { "page", page }, { "perpage", per_page },
-		{ "total", i } };
+	return { { "progress", progress }, { "queued", queued }, { "rest", rest }, { "page", page }, { "perpage", per_page } };
 }
 
-json Model::browse(const std::string &folder, const std::string &prefix, int levels)
+json Model::remote_need(const std::string &folder, const DeviceId &device, int page, int per_page)
 {
-	json out = json::object();
+	json files = json::array();
+	int i = 0;
+	const int skip = (page - 1) * per_page;
+	db_.each_remote_needed(folder, device, [&](const bep::FileInfo &f) {
+		if (i >= skip && i < skip + per_page)
+			files.push_back(file_json(f));
+		i++;
+		return i < skip + per_page;
+	});
+	return { { "files", files }, { "page", page }, { "perpage", per_page } };
+}
+
+json Model::local_changed(const std::string &folder, int page, int per_page)
+{
+	json files = json::array();
+	int i = 0;
+	const int skip = (page - 1) * per_page;
 	db_.each_local(folder, [&](const bep::FileInfo &f) {
-		if (f.deleted || is_invalid(f))
+		if (!(f.local_flags & kFlagReceiveOnly))
 			return true;
-		if (!prefix.empty() && !f.name.starts_with(prefix + "/"))
-			return true;
-		std::string rel = prefix.empty() ? f.name : f.name.substr(prefix.size() + 1);
-		json *node = &out;
-		size_t pos = 0;
-		int depth = 0;
-		for (;;) {
-			const auto slash = rel.find('/', pos);
-			const std::string part = rel.substr(pos, slash == std::string::npos ? std::string::npos : slash - pos);
-			if (slash == std::string::npos) {
-				if (f.type == bep::FileInfoType::directory) {
-					if (!node->contains(part))
-						(*node)[part] = json::object();
-				} else {
-					(*node)[part] = json::array({ rfc3339(f.modified_s, f.modified_ns), f.size });
-				}
-				break;
-			}
-			if (levels >= 0 && depth >= levels)
-				break;
-			if (!node->contains(part) || !(*node)[part].is_object())
-				(*node)[part] = json::object();
-			node = &(*node)[part];
-			pos = slash + 1;
-			depth++;
-		}
+		if (i >= skip && i < skip + per_page)
+			files.push_back(file_json(f));
+		i++;
+		return i < skip + per_page;
+	});
+	return { { "files", files }, { "page", page }, { "perpage", per_page } };
+}
+
+void Model::emit_disk_changes(const std::string &folder, const std::vector<bep::FileInfo> &files, bool local)
+{
+	const json f = config_.folder(folder);
+	const std::string label = f.is_null() ? folder : f.value("label", folder);
+	for (const auto &fi : files) {
+		if (is_invalid(fi))
+			continue;
+		uint8_t b[8];
+		for (int i = 0; i < 8; i++)
+			b[i] = static_cast<uint8_t>(fi.modified_by >> (56 - 8 * i));
+		events_.log(local ? "LocalChangeDetected" : "RemoteChangeDetected",
+			{ { "folder", folder }, { "folderID", folder }, { "label", label },
+				{ "action", fi.deleted ? "deleted" : "modified" },
+				{ "type", fi.type == bep::FileInfoType::directory ? "dir" : "file" }, { "path", fi.name },
+				{ "modifiedBy", base32::encode(b).substr(0, 7) } });
+	}
+}
+
+json Model::browse(const std::string &folder, const std::string &prefix_in, int levels, bool dirs_only)
+{
+	std::string prefix = prefix_in;
+	if (!prefix.empty() && prefix.back() != '/')
+		prefix += '/';
+	// Global files in name order, so parents come before their children.
+	std::vector<bep::FileInfo> files;
+	db_.each_global(folder, [&](const bep::FileInfo &f) {
+		if (!f.deleted && !is_invalid(f) && f.name.starts_with(prefix) && f.name.size() > prefix.size())
+			files.push_back(f);
 		return true;
 	});
-	return out;
+	std::sort(files.begin(), files.end(), [](const auto &a, const auto &b) { return a.name < b.name; });
+	json root = json::array();
+	for (const auto &f : files) {
+		const std::string rel = f.name.substr(prefix.size());
+		const auto depth = std::count(rel.begin(), rel.end(), '/');
+		if (levels > -1 && depth > levels)
+			continue;
+		if (dirs_only && f.type != bep::FileInfoType::directory)
+			continue;
+		json *parent = &root;
+		size_t pos = 0;
+		bool found = true;
+		for (;;) {
+			const auto slash = rel.find('/', pos);
+			if (slash == std::string::npos)
+				break;
+			const std::string part = rel.substr(pos, slash - pos);
+			json *next = nullptr;
+			for (auto &c : *parent)
+				if (c["name"] == part) {
+					if (!c.contains("children"))
+						c["children"] = json::array();
+					next = &c["children"];
+					break;
+				}
+			if (!next) {
+				found = false;
+				break;
+			}
+			parent = next;
+			pos = slash + 1;
+		}
+		if (!found)
+			continue;
+		static const char *types[] = { "FILE_INFO_TYPE_FILE", "FILE_INFO_TYPE_DIRECTORY", "FILE_INFO_TYPE_SYMLINK_FILE",
+			"FILE_INFO_TYPE_SYMLINK_DIRECTORY", "FILE_INFO_TYPE_SYMLINK" };
+		parent->push_back({ { "name", rel.substr(pos) }, { "modTime", rfc3339(f.modified_s, f.modified_ns) },
+			{ "size", f.size }, { "type", types[std::clamp(static_cast<int>(f.type), 0, 4)] } });
+	}
+	return root;
 }
 
 json Model::file_info(const std::string &folder, const std::string &name)
 {
-	auto to_json = [](const bep::FileInfo &f) {
-		json v = json::array();
-		for (const auto &c : f.version.counters)
-			v.push_back(std::to_string(c.id) + ":" + std::to_string(c.value));
-		return json{ { "name", f.name }, { "size", f.size }, { "modified", rfc3339(f.modified_s, f.modified_ns) },
-			{ "deleted", f.deleted }, { "invalid", is_invalid(f) }, { "sequence", f.sequence },
-			{ "numBlocks", f.blocks.size() }, { "version", v }, { "localFlags", f.local_flags },
-			{ "type", f.type == bep::FileInfoType::directory ? "FILE_INFO_TYPE_DIRECTORY" : "FILE_INFO_TYPE_FILE" },
-			{ "permissions", "0" + std::to_string(f.permissions) }, { "noPermissions", f.no_permissions } };
-	};
 	json out = json::object();
 	if (auto g = db_.global(folder, name))
-		out["global"] = to_json(*g);
+		out["global"] = file_json(*g);
 	if (auto l = db_.get(folder, Db::local_device(), name))
-		out["local"] = to_json(*l);
+		out["local"] = file_json(*l);
 	json avail = json::array();
 	for (const auto &d : db_.availability(folder, name))
 		avail.push_back({ { "id", d.to_string() }, { "fromTemporary", false } });

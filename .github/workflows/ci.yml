@@ -51,6 +51,8 @@ jobs:
           tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --relay "$RELAY" --relay-inbound --work /tmp/xst-interop-relay-in
       - name: Interop (FATX rules)
         run: tests/interop/run.py --syncthing "$ST" --xsyncthing build-host/xsyncthing --fatx --work /tmp/xst-interop-fatx
+      - name: REST API compared with stock Syncthing's, endpoint by endpoint
+        run: tests/interop/api_compare.py --syncthing "$ST" --xsyncthing build-host/xsyncthing
       - name: REST API as the Web GUI uses it
         run: tests/interop/api_check.py --xsyncthing build-host/xsyncthing
       - name: Stock Web GUI in headless Chromium

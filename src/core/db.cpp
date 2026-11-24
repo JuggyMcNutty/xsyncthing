@@ -365,6 +365,15 @@ void Db::each_local(const std::string &folder, const std::function<bool(const be
 			break;
 }
 
+void Db::each_global(const std::string &folder, const std::function<bool(const bep::FileInfo &)> &fn)
+{
+	Stmt s(db_, "SELECT fi FROM files WHERE folder = ?1 AND global = 1 ORDER BY name");
+	s.text(1, folder);
+	while (s.step())
+		if (!fn(decode_row(s.col_blob(0))))
+			break;
+}
+
 void Db::local_since(const std::string &folder, int64_t after, const std::function<bool(const bep::FileInfo &)> &fn)
 {
 	Stmt s(db_, "SELECT fi FROM files WHERE folder = ?1 AND device = ?2 AND sequence > ?3 ORDER BY sequence");
@@ -431,6 +440,30 @@ Db::Counts Db::need_counts(const std::string &folder)
 				"WHERE folder = ?1 AND need = 1 GROUP BY deleted, is_dir");
 	s.text(1, folder);
 	return counts_from(s);
+}
+
+void Db::each_remote_needed(const std::string &folder, const DeviceId &device,
+	const std::function<bool(const bep::FileInfo &)> &fn)
+{
+	Stmt s(db_, "SELECT g.fi, r.fi FROM files g LEFT JOIN files r ON r.folder = g.folder AND r.name = g.name AND "
+				"r.device = ?2 WHERE g.folder = ?1 AND g.global = 1 AND g.invalid = 0 ORDER BY g.name");
+	s.text(1, folder).device(2, device);
+	std::vector<bep::FileInfo> out;
+	while (s.step()) {
+		const auto g = decode_row(s.col_blob(0));
+		const auto rb = s.col_blob(1);
+		if (rb.data() != nullptr && rb.size() > 0) {
+			const auto r = decode_row(rb);
+			if (vec::greater_equal(r.version, g.version) || (g.deleted && r.deleted))
+				continue;
+		} else if (g.deleted) {
+			continue;
+		}
+		out.push_back(g);
+	}
+	for (const auto &f : out)
+		if (!fn(f))
+			break;
 }
 
 Db::Counts Db::remote_need_counts(const std::string &folder, const DeviceId &device)

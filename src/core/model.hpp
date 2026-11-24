@@ -99,8 +99,14 @@ public:
 	json device_stats() const;
 	json folder_stats() const;
 	json need(const std::string &folder, int page, int per_page);
-	json browse(const std::string &folder, const std::string &prefix, int levels);
+	// /rest/db/browse: the global tree under prefix as [{name, modTime, size, type, children}] (lib/model TreeEntry).
+	json browse(const std::string &folder, const std::string &prefix, int levels, bool dirs_only = false);
 	json file_info(const std::string &folder, const std::string &name);
+	// /rest/db/remoteneed: what device lacks of the global set; /rest/db/localchanged: receive-only local changes.
+	json remote_need(const std::string &folder, const DeviceId &device, int page, int per_page);
+	json local_changed(const std::string &folder, int page, int per_page);
+	// FileInfo as /rest/db/* show it (lib/api fileIntfJSONMap).
+	static json file_json(const bep::FileInfo &f);
 	void override_folder(const std::string &folder);
 	void revert_folder(const std::string &folder);
 
@@ -138,6 +144,8 @@ private:
 		const bep::FileInfo &file, const bep::BlockInfo &block, int index);
 	fs::Filesystem *folder_fs(const std::string &folder);
 	void wake(const std::string &folder, bool scan, bool pull);
+	// LocalChangeDetected / RemoteChangeDetected (the GUI's "Recent Changes"), as lib/model emitDiskChangeEvents.
+	void emit_disk_changes(const std::string &folder, const std::vector<bep::FileInfo> &files, bool local);
 
 	Config &config_;
 	Db &db_;

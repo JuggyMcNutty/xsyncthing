@@ -893,10 +893,18 @@ Response ApiServer::route(const Request &req)
 		return json_response(model.need(folder, page, per));
 	}
 	if (p == "/rest/db/remoteneed" || p == "/rest/db/localchanged") {
-		return json_response({ { "files", json::array() }, { "page", 1 }, { "perpage", 65536 } });
+		const int page = std::max(1, std::atoi(req.param("page", "1").c_str()));
+		const int per = std::max(1, std::atoi(req.param("perpage", "65536").c_str()));
+		if (p.ends_with("localchanged"))
+			return json_response(model.local_changed(folder, page, per));
+		const auto d = device_param(req);
+		if (!d)
+			return error_response(400, "device ID invalid");
+		return json_response(model.remote_need(folder, *d, page, per));
 	}
 	if (p == "/rest/db/browse")
-		return json_response(model.browse(folder, req.param("prefix"), std::atoi(req.param("levels", "-1").c_str())));
+		return json_response(model.browse(folder, req.param("prefix"),
+			req.has_param("levels") ? std::atoi(req.param("levels").c_str()) : -1, !req.param("dirsonly").empty()));
 	if (p == "/rest/db/file") {
 		const json j = model.file_info(folder, req.param("file"));
 		if (!j.contains("global") && !j.contains("local"))

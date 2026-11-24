@@ -130,7 +130,7 @@ xsyncthing/
 - [x] Relay client: pool lookup, join, session invites, BEP over a relay.
 
 ### Phase 5: REST API and Web GUI
-- [ ] HTTP server, API key, CSRF, `/rest/events` long-polling.
+- [x] HTTP server, API key, CSRF, `/rest/events` long-polling.
 - [ ] The endpoint subset the GUI uses, one endpoint at a time.
 - [ ] Optional HTTPS with an ECDSA-P256 cert.
 - [ ] Unsupported features (`system/upgrade`, `svc/report`, browse on symlinks, …) return safe stubs.
