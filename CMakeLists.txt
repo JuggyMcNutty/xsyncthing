@@ -26,8 +26,11 @@ target_compile_definitions(xst_sqlite PRIVATE SQLITE_THREADSAFE=1 SQLITE_DEFAULT
 	SQLITE_DQS=0 SQLITE_DEFAULT_CACHE_SIZE=-8192 SQLITE_DEFAULT_WAL_SYNCHRONOUS=1)
 target_compile_options(xst_sqlite PRIVATE -w)
 if(XSDK)
-	target_compile_definitions(xst_sqlite PRIVATE SQLITE_OS_OTHER=0 SQLITE_OMIT_WAL HAVE_USLEEP=0
-		SQLITE_ENABLE_LOCKING_STYLE=0 SQLITE_DEFAULT_LOCKING_MODE=1 SQLITE_TEMP_STORE=3 SQLITE_OMIT_SHARED_CACHE)
+	# SQLite's own Unix layer needs headers xsdk hasn't got (sys/ioctl.h, fcntl locks): ours replaces it.
+	target_compile_definitions(xst_sqlite PRIVATE SQLITE_OS_OTHER=1 SQLITE_OMIT_WAL SQLITE_DEFAULT_LOCKING_MODE=1
+		SQLITE_TEMP_STORE=3 SQLITE_OMIT_SHARED_CACHE SQLITE_OMIT_LOAD_EXTENSION)
+	target_sources(xst_sqlite PRIVATE src/platform/xsdk/sqlite_vfs.c)
+	target_include_directories(xst_sqlite PRIVATE third_party/sqlite)
 endif()
 
 # LZ4 (third_party/lz4, pinned tag): BEP's message compression.
@@ -69,11 +72,12 @@ target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite)
 target_sources(xst_core PRIVATE src/platform/posix/fs_posix.cpp)
 
 if(XSDK)
-	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp)
+	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp src/platform/xsdk/volume.cpp
+		src/platform/xsdk/console.cpp)
 	target_link_libraries(xst_platform PUBLIC xst_core)
 	target_compile_options(xst_platform PRIVATE ${XST_WARNINGS})
 
-	add_executable(xsyncthing src/main_xsdk.cpp)
+	add_executable(xsyncthing src/main_xsdk.cpp src/app.cpp src/services.cpp)
 	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core)
 	target_compile_options(xsyncthing PRIVATE ${XST_WARNINGS})
 	xsdk_add_xex(xsyncthing TITLE_ID ${XST_TITLE_ID} NAME "xsyncthing" VERSION ${PROJECT_VERSION}.0)

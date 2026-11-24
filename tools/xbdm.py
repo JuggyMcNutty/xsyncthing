@@ -80,6 +80,10 @@ class Xbdm:
 
     def put(self, local, remote):
         data = open(local, "rb").read()
+        if not data:
+            # XBDM creates an empty file straight away, answering 200 rather than 204.
+            line = self.command(f'sendfile name="{remote}" length=0x0')
+            return 0
         line = self.command(f'sendfile name="{remote}" length=0x{len(data):x}')
         if not line.startswith("204"):
             raise XbdmError(f"sendfile: {line}")

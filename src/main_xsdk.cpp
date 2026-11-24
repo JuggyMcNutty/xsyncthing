@@ -1,6 +1,7 @@
-// The console title. For now (Phase 0) it is the hello-world bring-up: it shows the version, the console's IPv4
-// address and the data folder at 720p until Back is pressed, and logs checks the way xsdk's titles do, to
-// xsyncthing.log beside the .xex.
+// The console title: runs the xsyncthing daemon (the same App as the host build) and, until the console UI lands,
+// a status screen at 720p: version, address, device ID, folders and connections. Back exits; so does Xbox Home,
+// which stops the daemon cleanly first. Logs checks the way xsdk's titles do, to xsyncthing.log beside the .xex.
+#include <atomic>
 #include <cinttypes>
 #include <cstdio>
 #include <format>
@@ -11,8 +12,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include "app.hpp"
 #include "core/version.hpp"
 #include "platform/platform.hpp"
+#include "platform/xsdk/console.hpp"
 #include "xsdk/gpu.h"
 #include "xsdk/kernel.h"
 #include "xsdk/log.h"
@@ -45,17 +48,30 @@ void check(const char *name, bool ok)
 	failed += !ok;
 }
 
-std::string address_text()
+std::string address_text() { return xst::console::address(); }
+
+xst::App *g_app = nullptr;
+std::atomic<bool> g_home{ false };
+
+// Xbox Home: the title is frozen; only flag it. The database is in TRUNCATE journal mode, so a stop that never runs
+// still leaves a consistent database (SQLite replays or discards the journal on the next open).
+void on_home() { g_home = true; }
+
+std::string status_text(xst::App &app)
 {
-	in_addr address{};
-	const int error = xsdk_net_address(&address);
-	if (error == EAGAIN)
-		return "getting an address...";
-	if (error != 0)
-		return std::format("no network (error {})", error);
-	char text[INET_ADDRSTRLEN] = {};
-	inet_ntop(AF_INET, &address, text, sizeof text);
-	return text;
+	std::string s;
+	for (const auto &f : app.config().folders()) {
+		const std::string id = f.value("id", "");
+		const auto st = app.model().folder_state(id);
+		s += std::format("Folder {:<20} {:<10} {}\n", f.value("label", id), st.state, f.value("path", ""));
+	}
+	for (const auto &c : app.model().connections())
+		s += std::format("Device {} connected ({}, {})\n", c->device().short_string(), c->address(), c->type());
+	const auto pending = app.model().pending_devices();
+	for (auto it = pending.begin(); it != pending.end(); ++it)
+		s += std::format("Pending device {} \"{}\" - add it from the Web GUI\n", it.key().substr(0, 7),
+			it.value().value("name", ""));
+	return s.empty() ? "No folders yet: open the Web GUI to add devices and folders.\n" : s;
 }
 
 // For automated runs (tools/xbdm.py): with game:\autoexit.txt present, the title ends by itself after this many
@@ -71,6 +87,7 @@ bool auto_exit_requested()
 void run(uint32_t width, uint32_t height)
 {
 	std::string address = address_text();
+	std::string status_lines;
 	const bool auto_exit = auto_exit_requested();
 	for (uint32_t frame = 0;; frame++) {
 		if (auto_exit && frame >= kAutoExitFrames) {
@@ -91,12 +108,20 @@ void run(uint32_t width, uint32_t height)
 			xsdk_log_write("xsyncthing: xsdk_present_begin failed: 0x%08X", (unsigned)status);
 			return;
 		}
+		if (g_home)
+			return;
 		xsdk_gpu_set_target(width, height);
 		const std::string title = std::format("{} {}", xst::client_name(), xst::client_version());
 		xsdk_text_draw(kSafeX, kSafeY, 3, kTextArgb, title.c_str());
-		xsdk_text_draw(kSafeX, kSafeY + 90, 1, kDimArgb, "Syncthing for the Xbox 360 - pre-alpha");
-		const std::string info = std::format("Address:   {}\nData:      {}", address, xst::platform::data_dir());
-		xsdk_text_draw(kSafeX, kSafeY + 140, 2, kTextArgb, info.c_str());
+		xsdk_text_draw(kSafeX, kSafeY + 70, 1, kDimArgb, "Syncthing for the Xbox 360 - pre-alpha");
+		std::string info = std::format("Address:   {}\nData:      {}", address, xst::platform::data_dir());
+		if (g_app)
+			info += std::format("\nDevice ID: {}\nWeb GUI:   http://{}:8384", g_app->identity().id.to_string(),
+				address);
+		xsdk_text_draw(kSafeX, kSafeY + 100, 1, kTextArgb, info.c_str());
+		if (g_app && frame % 30 == 0)
+			status_lines = status_text(*g_app);
+		xsdk_text_draw(kSafeX, kSafeY + 200, 1, kTextArgb, status_lines.c_str());
 		xsdk_text_draw(kSafeX, (int32_t)height - kSafeY - 20, 1, kDimArgb, "Back: exit");
 		xsdk_gpu_resolve(target, width, height, kClearArgb);
 		xsdk_present_end();
@@ -129,10 +154,30 @@ int main()
 	}
 	status = xsdk_text_open();
 	check("xsyncthing: xsdk_text_open", NT_SUCCESS(status));
+
+	xst::console::on_home(on_home);
+	xst::App::Options o;
+	o.data_dir = xst::platform::data_dir();
+	o.device_name = "Xbox 360";
+	o.gui_assets_dir = "game:/gui";
+	o.open_fs = xst::fs::open_console;
+	xst::App app(o);
+	xst::register_services(app);
+	std::string error;
+	const bool started = app.start(&error);
+	check("xsyncthing: the daemon starts", started);
+	if (started)
+		g_app = &app;
+	else
+		xsdk_log_write("xsyncthing: %s", error.c_str());
+
 	if (NT_SUCCESS(status)) {
 		run(width, height);
 		xsdk_text_close();
 	}
+	g_app = nullptr;
+	app.stop();
+	check("xsyncthing: the daemon stops", true);
 	xsdk_present_close();
 	xsdk_gpu_close();
 	xsdk_log_write("checks: %u passed, %u failed", (unsigned)passed, (unsigned)failed);

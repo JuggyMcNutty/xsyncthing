@@ -14,6 +14,7 @@ namespace {
 
 const char *kSchema = R"SQL(
 PRAGMA journal_mode = TRUNCATE;
+PRAGMA temp_store = MEMORY;
 PRAGMA synchronous = NORMAL;
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS files (

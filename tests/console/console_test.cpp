@@ -19,7 +19,12 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfcrypt/test/test.h>
 
+#include "core/db.hpp"
+#include "core/fs.hpp"
+#include "core/puller.hpp"
+#include "core/scanner.hpp"
 #include "core/version.hpp"
+#include "platform/xsdk/console.hpp"
 #include "net/bep_handshake.hpp"
 #include "net/identity.hpp"
 #include "net/tcp.hpp"
@@ -150,15 +155,93 @@ void test_handshake(const xst::Identity &identity)
 		xsdk_log_write("hello: %s", error.c_str());
 }
 
+// Phase 3: the index database through our SQLite VFS, the volume rules, and a scan on the hard disk.
+void test_storage()
+{
+	const std::string dir = "hdd:/xsyncthing-test";
+	std::string error;
+	::remove((dir + "/index.db").c_str());
+	auto db = xst::Db::open(dir + "/index.db", &error);
+	check("SQLite opens a database on hdd: through the xsdk VFS", db != nullptr);
+	if (!db) {
+		xsdk_log_write("db: %s", error.c_str());
+		return;
+	}
+	xst::bep::FileInfo f;
+	f.name = "a/b.txt";
+	f.size = 3;
+	f.sequence = 1;
+	f.version.counters = { { 1, 1 } };
+	db->begin();
+	db->update("t", xst::Db::local_device(), { f });
+	db->commit();
+	const auto back = db->get("t", xst::Db::local_device(), "a/b.txt");
+	check("a file record round-trips through the database", back && back->size == 3 && back->version == f.version);
+	db.reset();
+	auto again = xst::Db::open(dir + "/index.db", &error);
+	check("the database reopens with the record", again && again->get("t", xst::Db::local_device(), "a/b.txt"));
+	again.reset();
+
+	const auto rules = xst::fs::console_rules("hdd:/xsyncthing-test");
+	xsdk_log_write("hdd: is %s, names up to %u bytes", rules.type.c_str(), (unsigned)rules.max_name_bytes);
+	check("the hard disk is FATX or exFAT", rules.type == "fatx" || rules.type == "exfat");
+	if (rules.type == "fatx")
+		check("FATX refuses a 43-byte name", !xst::fs::unstorable_reason(std::string(43, 'n'), 1, rules).empty());
+
+	// Scan a small folder on the hard disk.
+	const std::string folder = dir + "/scan";
+	auto fsys = xst::fs::open_console(folder);
+	fsys->mkdir_all("");
+	fsys->mkdir_all("sub");
+	if (auto out = fsys->create("sub/data.bin")) {
+		std::vector<uint8_t> data(300 * 1024);
+		for (size_t i = 0; i < data.size(); i++)
+			data[i] = static_cast<uint8_t>(i * 7);
+		out->write_at(data, 0);
+		out->close();
+	}
+	::remove((dir + "/scan.db").c_str());
+	auto sdb = xst::Db::open(dir + "/scan.db", &error);
+	xst::IgnoreMatcher ignores;
+	xst::ScanOptions o;
+	o.folder_id = "scan";
+	o.short_id = 0x1234;
+	o.ignore_permissions = true;
+	o.mtime_window_ns = rules.mtime_window_ns;
+	const auto start = std::chrono::steady_clock::now();
+	const auto r = xst::scan(*fsys, *sdb, ignores, o);
+	const auto ms =
+		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+	xsdk_log_write("scan: %lld changed, %lld bytes hashed in %lld ms", (long long)r.changed,
+		(long long)r.hashed_bytes, (long long)ms);
+	const auto rec = sdb->get("scan", xst::Db::local_device(), "sub/data.bin");
+	check("a scan on hdd: hashes the file into 3 blocks", rec && rec->blocks.size() == 3 && rec->size == 300 * 1024);
+	const auto r2 = xst::scan(*fsys, *sdb, ignores, o);
+	check("a second scan finds nothing changed (mtime window)", r2.changed == 0);
+
+	// Rename over an existing file (the puller's last step): xsdk can't rename over, the fs layer removes first.
+	if (auto t = fsys->create(".syncthing.x.tmp")) {
+		const uint8_t one = 1;
+		t->write_at(std::span(&one, 1), 0);
+		t->close();
+	}
+	if (auto t = fsys->create("x")) {
+		t->close();
+	}
+	check("rename replaces an existing file", fsys->rename(".syncthing.x.tmp", "x") && fsys->stat("x")->size == 1);
+}
+
 } // namespace
 
 int main()
 {
 	xsdk_log_write("xst-console-test: %s %s", std::string(xst::client_name()).c_str(),
 		std::string(xst::client_version()).c_str());
-	test_wolfcrypt();
+	if (!std::ifstream("game:/skip-wolfcrypt.txt"))
+		test_wolfcrypt();
 	if (auto id = test_identity())
 		test_handshake(*id);
+	test_storage();
 	xsdk_log_write("checks: %u passed, %u failed", (unsigned)passed, (unsigned)failed);
 	return failed ? 1 : 0;
 }

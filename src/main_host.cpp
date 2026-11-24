@@ -18,10 +18,6 @@ volatile std::sig_atomic_t g_stop = 0;
 void on_signal(int) { g_stop = 1; }
 } // namespace
 
-namespace xst::fs {
-std::unique_ptr<Filesystem> open_posix_with_rules(const std::string &root, const VolumeRules &rules);
-}
-
 int main(int argc, char **argv)
 {
 	xst::App::Options o;

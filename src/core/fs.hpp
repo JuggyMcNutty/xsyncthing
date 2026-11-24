@@ -73,6 +73,10 @@ public:
 
 // The host's backend, rooted at an absolute directory.
 std::unique_ptr<Filesystem> open_posix(const std::string &root);
+std::unique_ptr<Filesystem> open_posix_with_rules(const std::string &root, const VolumeRules &rules);
+// The console's backend: the posix calls xsdk provides, with the volume's rules (src/platform/xsdk/volume.cpp).
+std::unique_ptr<Filesystem> open_console(const std::string &path);
+VolumeRules console_rules(const std::string &path);
 
 // Why a name from a peer can't be stored on this volume, or "" if it can.
 std::string unstorable_reason(std::string_view path, int64_t size, const VolumeRules &rules);

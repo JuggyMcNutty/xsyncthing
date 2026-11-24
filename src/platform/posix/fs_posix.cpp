@@ -152,8 +152,21 @@ public:
 
 	bool mkdir_all(std::string_view path) override
 	{
-		if (path.empty())
-			return true;
+		if (path.empty()) {
+			// The folder root itself: create it and its parents, as absolute paths.
+			struct stat st;
+			if (::stat(root_.c_str(), &st) == 0)
+				return S_ISDIR(st.st_mode);
+			for (size_t i = 1; i <= root_.size(); i++) {
+				if (i < root_.size() && root_[i] != '/')
+					continue;
+				const std::string part = root_.substr(0, i);
+				if (part.back() == ':')
+					continue; // a drive ("hdd:") exists
+				::mkdir(part.c_str(), 0755);
+			}
+			return ::stat(root_.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+		}
 		if (auto st = stat(path))
 			return st->kind == Kind::directory;
 		if (!mkdir_all(parent(path)))
