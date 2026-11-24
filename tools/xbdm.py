@@ -311,6 +311,27 @@ def main():
             data = x.get(a.args[0], a.args[1] if len(a.args) > 1 else None)
             if len(a.args) < 2:
                 sys.stdout.write(data.decode("utf-8", "replace"))
+        elif a.cmd == "putdir":
+            # Copies a local directory tree (e.g. assets/gui) to the console; names over 42 bytes (FATX) are skipped
+            # and listed, as the drive can't hold them.
+            local_root, remote_root = a.args
+            skipped, sent, total = [], 0, 0
+            for dirpath, dirnames, filenames in os.walk(local_root):
+                rel = os.path.relpath(dirpath, local_root)
+                parts = [] if rel == "." else rel.split(os.sep)
+                if any(len(p.encode()) > 42 for p in parts):
+                    continue
+                rdir = "\\".join([remote_root] + parts)
+                x.mkdir(rdir)
+                for fn in sorted(filenames):
+                    if len(fn.encode()) > 42:
+                        skipped.append(os.path.join(rel, fn))
+                        continue
+                    total += x.put(os.path.join(dirpath, fn), rdir + "\\" + fn)
+                    sent += 1
+            print(f"sent {sent} files ({total} bytes) to {remote_root}")
+            for sk in skipped:
+                print(f"skipped (name over 42 bytes): {sk}")
         elif a.cmd == "stop":
             # Asks one of our titles (in the folder given) to stop, then waits for the dashboard.
             stamp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".stop.txt")

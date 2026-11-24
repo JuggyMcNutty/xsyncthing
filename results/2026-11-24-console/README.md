@@ -111,3 +111,21 @@ On the host, `tests/interop/run.py --relay <strelaysrv>` runs the full interop s
 in both directions:
 - xsyncthing dials: 14/14
 - stock Syncthing dials, xsyncthing accepts the invitation: 12/12
+
+## Phase 5: REST API and Web GUI on the console (steps 17–19)
+
+- **The stock Web GUI, served from the console:** the `gui/` assets were copied beside the `.xex`. One file was left
+  out: `angular-translate-loader-static-files.js.LICENSE`, whose name is longer than FATX allows. Then
+  `http://192.168.1.118:8384/` was loaded in headless Chromium (`docs/img/webgui-console.png`). It showed:
+  - this device as "Xbox 360"
+  - the LAN test folder, Up to Date
+  - the PC as a remote device, Up to Date
+  - no JavaScript errors and no failed `/rest` calls
+- **HTTPS (`gui.useTLS`):** an ECDSA P-256 certificate is generated on the console at startup and kept in
+  `https-cert.pem` and `https-key.pem`. `openssl s_client` reported TLS 1.3 with `TLS_AES_256_GCM_SHA384` and the
+  subject `O=Syncthing, OU=Automatically Generated, CN=syncthing`. A ping takes about 9 ms. The GUI over HTTPS rendered
+  with no errors (`docs/img/webgui-console-https.png`).
+
+**Note on an interrupted run:** a USB stick with its own `launch.ini` was plugged in. DashLaunch reads USB first, so
+the console booted FSD3 rather than returning to the stock dashboard. That run's 60 s delay came from that, not from
+xsyncthing. Unplugging the stick restored normal behaviour.

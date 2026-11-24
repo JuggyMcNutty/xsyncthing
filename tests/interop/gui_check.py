@@ -23,6 +23,7 @@ def main():
     ap.add_argument("--xsyncthing", required=True)
     ap.add_argument("--work", default="/tmp/xst-gui")
     ap.add_argument("--screenshot", default="/tmp/xst-gui.png")
+    ap.add_argument("--https", action="store_true", help="serve the GUI over HTTPS (gui.useTLS)")
     a = ap.parse_args()
     shutil.rmtree(a.work, ignore_errors=True)
     os.makedirs(os.path.join(a.work, "docs"))
@@ -37,6 +38,8 @@ def main():
     c = json.load(open(cfgp))
     my_id = re.search(r"device ID ([A-Z0-9-]{63})", open(a.work + ".log").read()).group(1)
     c["gui"]["address"] = f"127.0.0.1:{PORT}"
+    c["gui"]["useTLS"] = a.https
+    scheme = "https" if a.https else "http"
     c["options"].update(listenAddresses=["tcp://127.0.0.1:22420"], globalAnnounceEnabled=False,
                         localAnnounceEnabled=False, relaysEnabled=False, urAccepted=-1)
     f = dict(c["defaults"]["folder"])
@@ -49,19 +52,21 @@ def main():
     try:
         for _ in range(50):
             try:
-                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/rest/noauth/health", timeout=1)
+                import ssl
+                ctx = ssl._create_unverified_context()
+                urllib.request.urlopen(f"{scheme}://127.0.0.1:{PORT}/rest/noauth/health", timeout=1, context=ctx)
                 break
             except Exception:
                 time.sleep(0.2)
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
-            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page = browser.new_page(viewport={"width": 1280, "height": 900}, ignore_https_errors=True)
             js_errors, failed = [], []
             page.on("pageerror", lambda e: js_errors.append(str(e)))
             page.on("console", lambda m: js_errors.append(m.text) if m.type == "error" else None)
             page.on("response", lambda r: failed.append(f"{r.status} {r.url}")
                     if "/rest/" in r.url and r.status >= 400 else None)
-            page.goto(f"http://127.0.0.1:{PORT}/", wait_until="domcontentloaded")
+            page.goto(f"{scheme}://127.0.0.1:{PORT}/", wait_until="domcontentloaded")
             # The GUI keeps a /rest/events long-poll open, so it never goes network-idle: wait for its content.
             page.wait_for_selector("text=Documents", timeout=30000)
             page.wait_for_timeout(3000)
