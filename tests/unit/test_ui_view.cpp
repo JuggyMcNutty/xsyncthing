@@ -1,5 +1,6 @@
 // Step 24: the console UI and the REST API share one source of truth. Each change made through one shows in the other
 // at once, because both read and write the same Config and Model.
+#include <cstdio>
 #include <filesystem>
 
 #include <unistd.h>
@@ -87,9 +88,17 @@ TEST(ui_and_api_share_one_model)
 	CHECK(std::any_of(devs.begin(), devs.end(), [](const json &d) { return d["deviceID"] == kPeer && d["name"] == "my pc"; }));
 
 	// The REST API renames it: the UI's next snapshot shows the new name.
-	t.rest("PATCH", std::string("/rest/config/devices/") + kPeer, json{ { "name", "renamed in web gui" } });
+	const json patched = t.rest("PATCH", std::string("/rest/config/devices/") + kPeer, json{ { "name", "renamed in web gui" } });
 	auto s = ui::snapshot(*t.app);
-	CHECK(std::any_of(s.devices.begin(), s.devices.end(), [](const ui::DeviceRow &d) { return d.name == "renamed in web gui"; }));
+	const bool renamed =
+		std::any_of(s.devices.begin(), s.devices.end(), [](const ui::DeviceRow &d) { return d.name == "renamed in web gui"; });
+	if (!renamed) {
+		std::printf("  PATCH answered %s; devices in the snapshot:", patched.dump().c_str());
+		for (const auto &d : s.devices)
+			std::printf(" [%s %s]", d.id.c_str(), d.name.c_str());
+		std::printf("; in config: %s\n", t.app->config().get()["devices"].dump().c_str());
+	}
+	CHECK(renamed);
 
 	// The UI shares a folder with it: the API's config and db/status have it.
 	const std::string path = (t.dir / "share").string();
