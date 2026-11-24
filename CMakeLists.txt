@@ -18,6 +18,18 @@ configure_file(src/core/version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/xst/
 
 include(cmake/wolfssl.cmake)
 
+# SQLite (third_party/sqlite, the 3.54.1 amalgamation): the index database. On the console it runs on xsdk's POSIX
+# file calls with no locking (one process), threadsafe (several threads), and a small page cache.
+add_library(xst_sqlite STATIC third_party/sqlite/sqlite3.c)
+target_include_directories(xst_sqlite SYSTEM PUBLIC third_party/sqlite)
+target_compile_definitions(xst_sqlite PRIVATE SQLITE_THREADSAFE=1 SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_OMIT_LOAD_EXTENSION
+	SQLITE_DQS=0 SQLITE_DEFAULT_CACHE_SIZE=-8192 SQLITE_DEFAULT_WAL_SYNCHRONOUS=1)
+target_compile_options(xst_sqlite PRIVATE -w)
+if(XSDK)
+	target_compile_definitions(xst_sqlite PRIVATE SQLITE_OS_OTHER=0 SQLITE_OMIT_WAL HAVE_USLEEP=0
+		SQLITE_ENABLE_LOCKING_STYLE=0 SQLITE_DEFAULT_LOCKING_MODE=1 SQLITE_TEMP_STORE=3 SQLITE_OMIT_SHARED_CACHE)
+endif()
+
 # LZ4 (third_party/lz4, pinned tag): BEP's message compression.
 add_library(xst_lz4 STATIC third_party/lz4/lib/lz4.c)
 target_include_directories(xst_lz4 SYSTEM PUBLIC third_party/lz4/lib)
@@ -27,20 +39,34 @@ add_library(xst_core STATIC
 	src/core/base32.cpp
 	src/core/bep.cpp
 	src/core/bep_frame.cpp
+	src/core/config.cpp
+	src/core/db.cpp
+	src/core/events.cpp
 	src/core/device_id.cpp
+	src/core/fs_common.cpp
+	src/core/glob.cpp
+	src/core/ignore.cpp
+	src/core/vector.cpp
 	src/core/hello.cpp
+	src/core/model.cpp
 	src/core/protowire.cpp
+	src/core/puller.cpp
+	src/core/scanner.cpp
 	src/core/sha256.cpp
 	src/core/version.cpp
 	src/net/bep_connection.cpp
 	src/net/bep_handshake.cpp
+	src/net/connection_service.cpp
 	src/net/identity.cpp
 	src/net/tcp.cpp
 	src/net/tls.cpp
 )
 target_include_directories(xst_core PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(xst_core SYSTEM PUBLIC third_party/include)
 target_compile_options(xst_core PRIVATE ${XST_WARNINGS})
-target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4)
+target_link_libraries(xst_core PUBLIC xst_wolfssl xst_lz4 xst_sqlite)
+# The posix filesystem backend serves both builds (xsdk maps POSIX file calls onto its drives).
+target_sources(xst_core PRIVATE src/platform/posix/fs_posix.cpp)
 
 if(XSDK)
 	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp)
@@ -62,7 +88,7 @@ else()
 	target_link_libraries(xst_platform PUBLIC xst_core)
 	target_compile_options(xst_platform PRIVATE ${XST_WARNINGS})
 
-	add_executable(xsyncthing src/main_host.cpp)
+	add_executable(xsyncthing src/main_host.cpp src/app.cpp src/services.cpp)
 	target_link_libraries(xsyncthing PRIVATE xst_platform xst_core)
 	target_compile_options(xsyncthing PRIVATE ${XST_WARNINGS})
 

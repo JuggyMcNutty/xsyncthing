@@ -85,6 +85,12 @@ void TcpListener::close()
 	}
 }
 
+void TcpListener::shutdown()
+{
+	if (fd_ >= 0)
+		::shutdown(fd_, SHUT_RDWR);
+}
+
 std::unique_ptr<TcpListener> TcpListener::listen(uint16_t port, std::string *error)
 {
 	const int fd = ::socket(AF_INET, SOCK_STREAM, 0);

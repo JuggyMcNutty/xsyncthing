@@ -107,7 +107,7 @@ xsyncthing/
 - [x] Add xsdk as a submodule. Write a `scripts/bootstrap.sh` that runs xsdk's `tools/toolchain/build.sh` to install
   `~/xsdk-gcc`.
 - [ ] Hello-world `.xex` built from `samples/template`; it runs in Xenia and on the console.
-- [ ] CI: a host job, plus an xsdk job that caches the toolchain and uploads the `.xex`.
+- [x] CI: a host job, plus an xsdk job that caches the toolchain and uploads the `.xex`.
 
 ### Phase 1: TLS spike (biggest risk)
 - [x] Port wolfSSL to xsdk with the settings above and run its tests (`wolfcrypt_test`) on the console.

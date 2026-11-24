@@ -33,6 +33,8 @@ public:
 	std::unique_ptr<TcpStream> accept(std::string *peer = nullptr);
 	uint16_t port() const { return port_; }
 	void close();
+	// Wakes a blocked accept() (which then returns nullptr).
+	void shutdown();
 
 private:
 	int fd_ = -1;
