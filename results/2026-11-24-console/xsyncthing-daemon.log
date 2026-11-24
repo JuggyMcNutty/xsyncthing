@@ -1,0 +1,24 @@
+log: game:\xsyncthing.log
+log: named after \Device\Harddisk0\Partition1\xsyncthing\xsyncthing.xex
+log: no net_log.txt beside the .xex, so not over the network
+xsyncthing: xsyncthing v0.0.1 starting
+display: 1280x720 scaled to the 1920x1080 output
+display: the line counter reached 720 after 28815 us
+PASS: xsyncthing: xsdk_gpu_open
+display: 1280x720 scaled to the 1920x1080 output
+display: the line counter reached 720 after 21565 us
+PASS: xsyncthing: xsdk_present_open
+PASS: xsyncthing: xsdk_text_open
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\) failed: 0xC0000035
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\xsyncthing) failed: 0xC0000035
+app: device ID SDHOS53-TTPHFBT-6SBF6IS-2QQKVNK-DR472SD-DV6KBTG-ZCLX3NU-DYNZZA4
+rename: NtSetInformationFile(\Device\Harddisk0\Partition1\xsyncthing\config.json.tmp) failed: 0xC0000022
+PASS: xsyncthing: the daemon starts
+connections: listening on tcp port 22000
+PASS: xsyncthing: the first frame was presented
+xsyncthing: address 192.168.1.118
+PASS: xsyncthing: presented frames until autoexit
+xsyncthing: the daemon stopped in 100 ms
+PASS: xsyncthing: the daemon stops
+checks: 7 passed, 0 failed
+exit: status 0

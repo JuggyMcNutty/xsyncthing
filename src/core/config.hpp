@@ -51,6 +51,7 @@ public:
 
 private:
 	void notify();
+	bool write_locked(std::string *error);
 	mutable std::mutex mu_;
 	json cfg_;
 	std::string path_;

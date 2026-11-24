@@ -1,0 +1,44 @@
+log: game:\xst-console-test.log
+log: named after \Device\Harddisk0\Partition1\xsyncthing\xst-console-test.xex
+log: no net_log.txt beside the .xex, so not over the network
+xst-console-test: xsyncthing v0.0.1
+mkdir: NtCreateFile(\Device\Harddisk0\Partition1\xsyncthing-test) failed: 0xC0000035
+PASS: an Ed25519 identity is generated
+generated in 1 ms; device ID JSFY56Y-EHN223X-JRMB4ZO-WYQV4DS-RZRIFRW-DUZBBKD-AHXZYRV-ZD43NAU
+PASS: cert.pem and key.pem are written to hdd:
+PASS: the identity reads back with the same device ID
+PASS: a second identity has a different device ID (the RNG is live)
+this console's test device ID: A2UYUF2-54DCTXR-ZKDORXK-QYAIZLL-YUS4RL7-S7NRGLI-JN4Z2RT-JR2BWQI
+PASS: peer.txt's device ID parses
+PASS: TCP connect to 192.168.1.125:22000
+PASS: TLS 1.3 handshake with the peer
+TLS in 9 ms: TLSv1.3 TLS_AES_128_GCM_SHA256, ALPN bep/1.0
+PASS: the TLS version is 1.3
+PASS: ALPN is bep/1.0
+PASS: the peer's device ID is the one in peer.txt
+PASS: Hello exchanged
+peer Hello: device "bazzite", client syncthing v2.1.7
+PASS: SQLite opens a database on hdd: through the xsdk VFS
+PASS: a file record round-trips through the database
+PASS: the database reopens with the record
+volume: hdd:/xsyncthing-test is fatx (kernel says "FATX", names up to 42)
+hdd: is fatx, names up to 42 bytes
+PASS: the hard disk is FATX or exFAT
+PASS: FATX refuses a 43-byte name
+volume: hdd:/xsyncthing-test/scan is fatx (kernel says "FATX", names up to 42)
+scan: 3 changed, 307201 bytes hashed in 107 ms
+PASS: a scan on hdd: hashes the file into 3 blocks
+PASS: a second scan finds nothing changed (mtime window)
+PASS: rename replaces an existing file
+volume: hdd:/xst-volume-test is fatx (kernel says "FATX", names up to 42)
+volume hdd:: fatx, names <= 42 bytes, files <= 4294967295 bytes, mtime step 2000000000 ns
+volume: hdd:/xst-volume-test is fatx (kernel says "FATX", names up to 42)
+PASS: volume hdd: (fatx): the longest name it takes writes, renames, removes
+volume: usb0:/xst-volume-test is fat32 (kernel says "FAT32", names up to 255)
+volume usb0:: fat32, names <= 255 bytes, files <= 4294967295 bytes, mtime step 2000000000 ns
+volume: usb0:/xst-volume-test is fat32 (kernel says "FAT32", names up to 255)
+PASS: volume usb0: (fat32): the longest name it takes writes, renames, removes
+volume usb1:: not present
+volume usb2:: not present
+checks: 21 passed, 0 failed
+exit: status 0

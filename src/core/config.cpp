@@ -61,6 +61,10 @@ bool Config::load(const std::string &path, const DeviceId &my_id, const std::str
 	path_ = path;
 	my_id_ = my_id;
 	std::ifstream in(path);
+	if (!in) {
+		// An interrupted save leaves only the new file, still named .tmp.
+		in.open(path + ".tmp");
+	}
 	if (in) {
 		std::stringstream ss;
 		ss << in.rdbuf();
@@ -92,24 +96,17 @@ bool Config::load(const std::string &path, const DeviceId &my_id, const std::str
 		fill_folder(f);
 	for (auto &d : cfg_["devices"])
 		fill_device(d);
-	std::ofstream out(path_ + ".tmp", std::ios::trunc);
-	out << cfg_.dump(1);
-	out.close();
-	std::rename((path_ + ".tmp").c_str(), path_.c_str());
-	return true;
+	return write_locked(error);
 }
 
-bool Config::save(std::string *error)
+bool Config::write_locked(std::string *error)
 {
-	std::string text;
-	{
-		std::lock_guard lock(mu_);
-		text = cfg_.dump(1);
-	}
+	// Write beside, then swap in. The console can't rename over an existing file, so the old one goes first; if
+	// power is lost between the two, load() finds config.json.tmp and takes it.
 	const std::string tmp = path_ + ".tmp";
 	{
 		std::ofstream out(tmp, std::ios::trunc);
-		out << text;
+		out << cfg_.dump(1);
 		out.close();
 		if (!out) {
 			if (error)
@@ -117,13 +114,19 @@ bool Config::save(std::string *error)
 			return false;
 		}
 	}
-	std::remove(path_.c_str()); // the console can't rename over an existing file
+	std::remove(path_.c_str());
 	if (std::rename(tmp.c_str(), path_.c_str()) != 0) {
 		if (error)
-			*error = "renaming config failed";
+			*error = "renaming " + tmp + " failed";
 		return false;
 	}
 	return true;
+}
+
+bool Config::save(std::string *error)
+{
+	std::lock_guard lock(mu_);
+	return write_locked(error);
 }
 
 json Config::get() const

@@ -106,7 +106,7 @@ xsyncthing/
   (xbox360, syncthing, homebrew, xsdk).
 - [x] Add xsdk as a submodule. Write a `scripts/bootstrap.sh` that runs xsdk's `tools/toolchain/build.sh` to install
   `~/xsdk-gcc`.
-- [ ] Hello-world `.xex` built from `samples/template`; it runs in Xenia and on the console.
+- [x] Hello-world `.xex` built from `samples/template`; it runs in Xenia and on the console.
 - [x] CI: a host job, plus an xsdk job that caches the toolchain and uploads the `.xex`.
 
 ### Phase 1: TLS spike (biggest risk)
@@ -117,7 +117,7 @@ xsyncthing/
 ### Phase 2: BEP core (host-first)
 - [x] Device ID, nanopb messages, framing, LZ4, Hello/ClusterConfig/Index/Request/Response/Ping/Close.
 - [x] SQLite schema and index DB; the scanner with ignores; the model and version vectors; the puller with conflicts.
-- [ ] Docker interop test: a send-receive folder between the host build and stock Syncthing, both directions.
+- [x] Docker interop test: a send-receive folder between the host build and stock Syncthing, both directions.
 
 ### Phase 3: Console platform layer
 - [ ] fs backends for FATX, FAT32 and exFAT, with the name and size checks; an SQLite VFS; thread placement;

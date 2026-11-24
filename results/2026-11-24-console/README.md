@@ -21,3 +21,33 @@ remote.client=xsyncthing remote.version=v0.0.1)`.
 
 **Earlier attempt:** the console hung once, in an earlier run. `tools/xbdm.py` had sent `magicboot` while the console
 was still booting (`lhelper.xex` was running). The script now waits for a settled dashboard first.
+
+## Phase 3: storage and the daemon (same day)
+
+| Run | Result |
+|---|---|
+| `xst-console-test.xex` | 21/21, broken down below |
+| `xsyncthing.xex`, the daemon | 7/7, broken down below |
+
+What `xst-console-test.xex` covered:
+- SQLite on `hdd:` through `src/platform/xsdk/sqlite_vfs.c`: a record written, read back and reopened
+- The volume type from the kernel's `FileFsAttributeInformation`:
+  - `hdd:` reports "FATX", with names of at most 42 bytes
+  - a USB stick on `usb0:` reports "FAT32", with names of at most 255 bytes
+- A scan of 300 KiB on `hdd:` in 129 ms; a rescan finds no changes, thanks to the 2 s mtime window
+- A file is replaced by rename on `hdd:`
+- On both FATX and FAT32: a file with the longest name each takes is written, renamed and removed
+
+What the daemon run covered:
+- It starts: identity, `config.json` and `index.db` on `hdd:/xsyncthing`, listening on 22000
+- It shows its status screen
+- It stops in 100 ms
+
+**Before the fix:** the first daemon run never ended. A blocked `accept()` isn't woken by `shutdown()` under XAM's
+Winsock, so stopping waited for it. `xbdm.py` then rebooted the console under the running title, and the console hung.
+Fixed by:
+- bounded accept and connect waits
+- a `stop.txt` request instead of rebooting under a running title
+- a 15 s watchdog on stopping
+
+**Not covered on hardware:** exFAT. No exFAT drive was on hand. Its rules (255-byte names, no 4 GB limit) are unit-tested on the host.

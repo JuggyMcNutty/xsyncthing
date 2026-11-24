@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
+#include <cstdio>
 
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfcrypt/test/test.h>
@@ -231,6 +232,40 @@ void test_storage()
 	check("rename replaces an existing file", fsys->rename(".syncthing.x.tmp", "x") && fsys->stat("x")->size == 1);
 }
 
+// Every drive xsyncthing can keep folders on: its type and rules, and a write-read-rename where it's writable.
+void test_volumes()
+{
+	for (const char *drive : { "hdd:", "usb0:", "usb1:", "usb2:" }) {
+		struct stat st;
+		if (::stat((std::string(drive) + "/").c_str(), &st) != 0) {
+			xsdk_log_write("volume %s: not present", drive);
+			continue;
+		}
+		const std::string dir = std::string(drive) + "/xst-volume-test";
+		const auto rules = xst::fs::console_rules(dir);
+		xsdk_log_write("volume %s: %s, names <= %u bytes, files <= %lld bytes, mtime step %lld ns", drive,
+			rules.type.c_str(), (unsigned)rules.max_name_bytes, (long long)rules.max_file_size,
+			(long long)rules.mtime_window_ns);
+		auto fsys = xst::fs::open_console(dir);
+		if (!fsys->mkdir_all("")) {
+			xsdk_log_write("volume %s: read-only or full (%s)", drive, fsys->last_error().c_str());
+			continue;
+		}
+		const std::string longest(rules.max_name_bytes - 4, 'n');
+		bool ok = false;
+		if (auto f = fsys->create(longest + ".txt")) {
+			const uint8_t d[3] = { 1, 2, 3 };
+			ok = f->write_at(d, 0) == 3;
+			f->close();
+		}
+		ok = ok && fsys->rename(longest + ".txt", "renamed.txt") && fsys->stat("renamed.txt") &&
+			fsys->stat("renamed.txt")->size == 3 && fsys->remove("renamed.txt");
+		check(std::string("volume ") + drive + " (" + rules.type + "): the longest name it takes writes, renames, removes",
+			ok);
+		fsys->remove("");
+	}
+}
+
 } // namespace
 
 int main()
@@ -242,6 +277,7 @@ int main()
 	if (auto id = test_identity())
 		test_handshake(*id);
 	test_storage();
+	test_volumes();
 	xsdk_log_write("checks: %u passed, %u failed", (unsigned)passed, (unsigned)failed);
 	return failed ? 1 : 0;
 }
