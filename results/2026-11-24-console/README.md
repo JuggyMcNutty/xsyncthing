@@ -163,3 +163,22 @@ through the same calls the REST API makes. The unit test `ui_and_api_share_one_m
 - a rename through the API shows in the UI
 - a pause through the API shows in the UI
 - a password set in the UI is bcrypt in `config.gui`
+
+## Phase 7: 100,000 files on the console's hard disk, and a real power loss (steps 25–26)
+
+`xst-soak.xex` worked on `hdd:/xst-soak` (FATX) with 1 KiB files, about 100 to a directory. Logs are in
+`xst-soak-100k*.log`.
+
+| Phase | Result |
+|---|---|
+| Create 100,000 source files | 1.9 min |
+| Scan, hashing every file | 101,010 entries in 6.2 min (273 files/s), 16 MiB |
+| Rescan, nothing changed | 27 s |
+| Receive the index as a peer's | 39 s, 17 MiB |
+| Pull (fsync off) | **interrupted**: the console was rebooted by hand at about 70,700 of 101,010 |
+| Resume after the reboot | both databases reopened; 29,405 files still needed; pulled in 25 min (19 files/s), 0 errors, 0 conflict copies |
+| Verify: re-hash the destination, compare with the source | **100,000 identical, 0 different, 0 missing, 0 extra**; 0 temp files left |
+
+The reboot wasn't planned, so it tested power loss on real hardware. SQLite's journal kept both databases
+consistent. The puller's per-1000-file commits let it continue where it stopped. Files renamed into place before the
+reboot, but not yet recorded, were adopted rather than fetched again.

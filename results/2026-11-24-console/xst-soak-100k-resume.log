@@ -1,0 +1,14 @@
+log: game:\xst-soak.log
+log: named after \Device\Harddisk0\Partition1\xsyncthing\xst-soak.xex
+log: also over UDP to 192.168.1.125:7381
+volume: hdd:/xst-soak/src is fatx (kernel says "FATX", names up to 42)
+volume: hdd:/xst-soak/dst is fatx (kernel says "FATX", names up to 42)
+resume: databases reopen: yes
+resume: 29405 files still needed after the interruption
+resume: pulled 29405 files in 1520.9 s (19 files/s), 0 errors; 0 conflict copies
+resume: left to pull: 0
+unlink: NtCreateFile(\Device\Harddisk0\Partition1\xst-soak\verify.db) failed: 0xC0000034
+verify: destination re-hashed in 360.4 s; 0 leftover temp files removed
+verify: 100000 identical, 0 different, 0 missing, 0 extra (e.g. conflict copies)
+checks: 1 passed, 0 failed
+exit: status 0

@@ -60,6 +60,11 @@ Measured with `tools/soak.cpp`, 1 KiB files, about 100 to a directory:
 |---|---|---|---|
 | Host (Linux, NVMe), 100,000 files | 3.5 s (29k files/s) | 9 s (11k files/s) | 24 MiB |
 | Console hard disk (FATX), 2,000 files | 1,000 files/s | 22 files/s (fsync on); 250 files/s (fsync off) | 3 MiB |
+| Console hard disk (FATX), 100,000 files | 273 files/s (6.2 min) | 19 files/s (fsync off) | 17 MiB |
+
+**Power loss:** the 100,000-file pull on the console was cut off by a manual reboot partway through. After restarting,
+it finished the remaining 29,405 files. All 100,000 files then re-hashed identical to the source, with no conflict
+copies and no leftover temp files (`results/2026-11-24-console`).
 
 On the console, a pulled file's cost is dominated by `fsync`: about 37 ms per file on the stock hard disk. Like
 upstream, xsyncthing syncs each file to disk before renaming it into place, so a power cut can't leave a half-written

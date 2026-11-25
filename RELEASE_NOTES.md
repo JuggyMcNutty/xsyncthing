@@ -17,7 +17,9 @@ Everything below was verified on a JTAG Jasper (kernel 17559) against stock Sync
   deleted elsewhere.
 - **The stock Syncthing Web GUI,** served from the console over HTTP or HTTPS
 - **A controller UI on the TV:** overview, a QR code for pairing, devices, folders, requests, settings, log
-- **Recovery after crashes or power loss:** the database, temp files and partially pulled folders recover
+- **Recovery after crashes or power loss:** a 100,000-file pull on the console survived a reboot in the middle, and
+  every file verified identical afterwards
+- **Progress screens** on the test titles, and scan/sync progress in the UI, so long runs never look frozen
 
 ## Known limitations
 
