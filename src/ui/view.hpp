@@ -19,6 +19,8 @@ struct FolderRow {
 	int errors = 0;
 	bool paused = false;
 	std::vector<std::string> shared_with; // device names
+	int64_t scan_files = 0;            // while scanning
+	int64_t pull_done = 0, pull_total = 0; // while syncing
 };
 
 struct DeviceRow {

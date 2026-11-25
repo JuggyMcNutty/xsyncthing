@@ -9,6 +9,7 @@
 //      handshake with it (ALPN bep/1.0, both certificates), the peer's device ID checked, and Hello exchanged.
 //      For the peer to accept us, first add the device ID the log shows as a device in that Syncthing.
 #include <chrono>
+#include <thread>
 #include <cstdio>
 #include <format>
 #include <fstream>
@@ -29,6 +30,8 @@
 #include "net/bep_handshake.hpp"
 #include "net/identity.hpp"
 #include "net/tcp.hpp"
+#include "platform/progress.hpp"
+#include "platform/xsdk/progress_screen.hpp"
 #include "xsdk/log.h"
 
 namespace {
@@ -39,6 +42,8 @@ uint32_t failed;
 void check(const std::string &name, bool ok)
 {
 	xsdk_log_write("%s: %s", ok ? "PASS" : "FAIL", name.c_str());
+	xst::progress::note(std::string(ok ? "PASS  " : "FAIL  ") + name);
+	xst::progress::advance();
 	passed += ok;
 	failed += !ok;
 }
@@ -272,12 +277,23 @@ int main()
 {
 	xsdk_log_write("xst-console-test: %s %s", std::string(xst::client_name()).c_str(),
 		std::string(xst::client_version()).c_str());
-	if (!std::ifstream("game:/skip-wolfcrypt.txt"))
+	xst::progress::set_title("xsyncthing console tests");
+	xst::progress::start_screen();
+	if (!std::ifstream("game:/skip-wolfcrypt.txt")) {
+		xst::progress::phase("wolfCrypt's test suite (about a minute)", 0, "checks");
 		test_wolfcrypt();
+	}
+	xst::progress::phase("identity and TLS handshake", 0, "checks");
 	if (auto id = test_identity())
 		test_handshake(*id);
+	xst::progress::phase("storage: SQLite, FATX, scanning", 0, "checks");
 	test_storage();
+	xst::progress::phase("volumes: hdd and USB", 0, "checks");
 	test_volumes();
 	xsdk_log_write("checks: %u passed, %u failed", (unsigned)passed, (unsigned)failed);
+	xst::progress::note(std::format("{} passed, {} failed", passed, failed));
+	xst::progress::finish(failed == 0);
+	std::this_thread::sleep_for(std::chrono::seconds(10));
+	xst::progress::stop_screen();
 	return failed ? 1 : 0;
 }

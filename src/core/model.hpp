@@ -55,6 +55,9 @@ public:
 		std::string error;
 		std::string state_changed;
 		int64_t scan_hashed = 0;
+		int64_t scan_files = 0;   // walked so far in the running scan
+		int64_t pull_done = 0;    // pulled so far in the running pull
+		int64_t pull_total = 0;   // needed when the pull started
 		std::map<std::string, std::string> pull_errors;
 		std::string last_scan;
 		int64_t sequence = 0;

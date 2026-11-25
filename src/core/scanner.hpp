@@ -29,6 +29,8 @@ struct ScanOptions {
 	int64_t temp_lifetime_s = 24 * 3600;
 	// Counts what was removed.
 	int64_t *temps_removed = nullptr;
+	// Called with each file walked (for a progress display).
+	std::function<void()> on_file;
 	// Each batch of changes recorded (for LocalChangeDetected).
 	std::function<void(const std::vector<bep::FileInfo> &)> on_changes;
 };

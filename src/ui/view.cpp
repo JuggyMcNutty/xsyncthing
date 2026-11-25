@@ -103,6 +103,9 @@ Snapshot snapshot(App &app)
 		row.state = row.paused ? "paused" : st.state;
 		row.error = st.error;
 		row.errors = static_cast<int>(st.pull_errors.size());
+		row.scan_files = st.scan_files;
+		row.pull_done = st.pull_done;
+		row.pull_total = st.pull_total;
 		const json status = model.folder_status(row.id);
 		row.global_bytes = status.value("globalBytes", 0);
 		row.need_bytes = status.value("needBytes", 0);

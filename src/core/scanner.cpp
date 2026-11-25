@@ -166,6 +166,8 @@ ScanResult scan(fs::Filesystem &fs, Db &db, const IgnoreMatcher &ignores, const 
 				continue;
 			}
 			seen.insert(path);
+			if (options.on_file)
+				options.on_file();
 			const auto old = db.get(options.folder_id, local, path);
 			const bool was_valid = old && !old->deleted && !(old->local_flags & kLocalInvalidFlags);
 

@@ -299,6 +299,14 @@ void Model::folder_loop(const std::string &id)
 			o.temp_lifetime_s = first_scan ? 0 : static_cast<int64_t>(config_.options().value("keepTemporariesH", 24)) * 3600;
 			o.temps_removed = &temps;
 			o.on_changes = [&](const std::vector<bep::FileInfo> &changed) { emit_disk_changes(id, changed, true); };
+			{
+				std::lock_guard lock(mu_);
+				f->state.scan_files = 0;
+			}
+			o.on_file = [&] {
+				std::lock_guard lock(mu_);
+				f->state.scan_files++;
+			};
 			o.progress = [&](int64_t hashed) {
 				std::lock_guard lock(mu_);
 				f->state.scan_hashed = hashed;
@@ -350,7 +358,21 @@ void Model::folder_loop(const std::string &id)
 				o.max_name_bytes = rules.max_name_bytes;
 				o.fsync = !f->cfg.value("disableFsync", false);
 				o.cancel = &f->cancel;
-				o.on_pulled = [&](const bep::FileInfo &f) { emit_disk_changes(id, { f }, false); };
+				{
+					int64_t total = 0;
+					db_.each_needed(id, [&](const bep::FileInfo &) {
+						total++;
+						return true;
+					});
+					std::lock_guard lock(mu_);
+					f->state.pull_done = 0;
+					f->state.pull_total = total;
+				}
+				o.on_pulled = [&](const bep::FileInfo &pf) {
+					emit_disk_changes(id, { pf }, false);
+					std::lock_guard lock(mu_);
+					f->state.pull_done++;
+				};
 				o.on_item = [&](const std::string &name, const std::string &err) {
 					events_.log("ItemFinished", { { "folder", id }, { "item", name }, { "type", "file" },
 													 { "action", "update" },

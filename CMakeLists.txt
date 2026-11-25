@@ -81,6 +81,7 @@ add_library(xst_core STATIC
 	src/net/local_discovery.cpp
 	src/net/relay.cpp
 	src/platform/log_ring.cpp
+	src/platform/progress.cpp
 	src/ui/console_ui.cpp
 	src/ui/view.cpp
 	src/net/tcp.cpp
@@ -97,7 +98,7 @@ target_sources(xst_core PRIVATE src/platform/posix/fs_posix.cpp)
 
 if(XSDK)
 	add_library(xst_platform STATIC src/platform/xsdk/platform.cpp src/platform/xsdk/volume.cpp
-		src/platform/xsdk/console.cpp src/platform/xsdk/addresses.cpp)
+		src/platform/xsdk/console.cpp src/platform/xsdk/addresses.cpp src/platform/xsdk/progress_screen.cpp)
 	target_link_libraries(xst_platform PUBLIC xst_core)
 	target_compile_options(xst_platform PRIVATE ${XST_WARNINGS})
 

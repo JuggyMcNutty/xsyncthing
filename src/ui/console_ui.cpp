@@ -33,7 +33,7 @@ ImVec4 text_colour(const std::string &st)
 		return kBad;
 	if (st == "Out of Sync")
 		return kWarn;
-	return kAccent; // Scanning, Syncing
+	return kAccent; // Scanning (n files), Syncing n / m
 }
 
 std::string state_text(const FolderRow &f)
@@ -43,9 +43,10 @@ std::string state_text(const FolderRow &f)
 	if (!f.error.empty() || f.state == "error")
 		return "Error";
 	if (f.state == "scanning")
-		return "Scanning";
+		return "Scanning (" + std::to_string(f.scan_files) + " files)";
 	if (f.state == "syncing")
-		return "Syncing";
+		return f.pull_total > 0 ? "Syncing " + std::to_string(f.pull_done) + " / " + std::to_string(f.pull_total)
+								: std::string("Syncing");
 	if (f.shared_with.empty())
 		return "Unshared";
 	if (f.need_items > 0)
@@ -335,7 +336,10 @@ void ConsoleUi::draw_dashboard()
 		ImGui::TextUnformatted(f.label.c_str());
 		ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.62f);
 		ImGui::TextColored(text_colour(st), "%s", st.c_str());
-		if (f.need_items > 0 && !f.paused) {
+		if (f.state == "syncing" && f.pull_total > 0) {
+			progress(100.0 * static_cast<double>(f.pull_done) / static_cast<double>(f.pull_total),
+				ImGui::GetContentRegionAvail().x * 0.9f);
+		} else if (f.need_items > 0 && !f.paused) {
 			progress(f.completion, ImGui::GetContentRegionAvail().x * 0.9f);
 		} else {
 			ImGui::TextDisabled("%s  -  %lld files, %s", f.path.c_str(), static_cast<long long>(f.local_files),
