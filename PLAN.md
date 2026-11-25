@@ -147,7 +147,7 @@ xsyncthing/
 - [x] Memory limits and soak tests (large folders, about 100k files); throughput tuning
   (thread placement, SHA-256 speed).
 - [x] Recover after power loss (SQLite journal, temp-file cleanup).
-- [ ] Write `docs/COMPAT.md`; tag v0.1.0 with the `.xex` and GUI assets as a GitHub Release.
+- [x] Write `docs/COMPAT.md`; tag v0.1.0 with the `.xex` and GUI assets as a GitHub Release.
 
 ## Verification
 - **Host unit tests (CI):** protocol encode/decode against golden bytes from upstream, device ID and Luhn vectors,

@@ -76,8 +76,24 @@ class Xbdm:
             if "exists" not in str(e).lower() and "410" not in str(e):
                 raise
 
-    def rm(self, path):
-        self.command(f'delete name="{path}"')
+    def rm(self, path, directory=False):
+        self.command(f'delete name="{path}"' + (" dir" if directory else ""))
+
+    def rmtree(self, path, progress=None):
+        """Deletes a directory tree, depth first; returns the number of entries removed."""
+        n = 0
+        for line in self.ls(path):
+            name = line.split('"')[1]
+            child = path.rstrip("\\") + "\\" + name
+            if " directory" in line or line.endswith("directory"):
+                n += self.rmtree(child, progress)
+            else:
+                self.rm(child)
+                n += 1
+                if progress and n % 1000 == 0:
+                    progress(n)
+        self.rm(path, directory=True)
+        return n + 1
 
     def put(self, local, remote):
         data = open(local, "rb").read()
@@ -305,6 +321,11 @@ def main():
             x.mkdir(a.args[0])
         elif a.cmd == "rm":
             x.rm(a.args[0])
+        elif a.cmd == "rmtree":
+            for target in a.args:
+                t0 = time.time()
+                n = x.rmtree(target, lambda k: print(f"  {target}: {k} removed...", flush=True))
+                print(f"removed {target}: {n} entries in {time.time() - t0:.0f} s", flush=True)
         elif a.cmd == "put":
             print(x.put(a.args[0], a.args[1]), "bytes")
         elif a.cmd == "get":

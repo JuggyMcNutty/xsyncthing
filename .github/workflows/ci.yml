@@ -136,5 +136,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "$GITHUB_REF_NAME" dist/xsyncthing-*.zip build-xsdk/xsyncthing.xex
+          gh release create "$GITHUB_REF_NAME" dist/xsyncthing-*.zip
           --repo "$GITHUB_REPOSITORY" --title "xsyncthing $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --prerelease
